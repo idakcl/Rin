@@ -6,7 +6,7 @@ import Loading from 'react-loading';
 import { FlatInset, FlatTabButton } from "@rin/ui";
 import { useAlert } from "./dialog";
 import { useColorMode } from "../utils/darkModeUtils";
-import { buildMarkdownImage, uploadImageFile } from "../utils/image-upload";
+import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE } from "../utils/image-upload";
 import { Markdown } from "./markdown";
 
 
@@ -78,24 +78,62 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
     file: File,
     range: NonNullable<ReturnType<editor.IStandaloneCodeEditor["getSelection"]>>,
     showAlert: (msg: string) => void,
-  ) {
+  ): Promise<EditorPosition | undefined> {
     try {
       const result = await uploadImageFile(file);
       const editorInstance = editorRef.current;
-      if (!editorInstance) return;
+      if (!editorInstance) return undefined;
+      const imageText = buildMarkdownImage(file.name, result.url, {
+        blurhash: result.blurhash,
+        width: result.width,
+        height: result.height,
+      });
       editorInstance.executeEdits(undefined, [{
         range,
-        text: buildMarkdownImage(file.name, result.url, {
-          blurhash: result.blurhash,
-          width: result.width,
-          height: result.height,
-        }),
+        text: imageText,
       }]);
+      editorInstance.focus();
+      return positionAfterText(range.startLineNumber, range.startColumn, imageText);
     } catch (error) {
       console.error(error);
       showAlert(error instanceof Error ? error.message : t("upload.failed"));
+      return undefined;
     }
   }
+
+  // Upload and insert multiple images one by one, advancing the cursor after
+  // each image so they stack vertically instead of overlapping at one position.
+  const insertImagesSequentially = async (
+    files: FileList | File[],
+    showAlert: (msg: string) => void,
+  ) => {
+    const editorInstance = editorRef.current;
+    if (!editorInstance) return;
+
+    let cursor = editorInstance.getSelection();
+    if (!cursor) return;
+
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        if (!isImageFile(file)) {
+          showAlert(t("upload.image.invalid_type"));
+          continue;
+        }
+        if (file.size > DEFAULT_IMAGE_MAX_FILE_SIZE) {
+          showAlert(t("upload.failed$size", { size: Math.round(DEFAULT_IMAGE_MAX_FILE_SIZE / 1024 / 1024) }));
+          continue;
+        }
+        const next = await insertImage(file, cursor, showAlert);
+        if (next) {
+          cursor = new Selection(next.lineNumber, next.column, next.lineNumber, next.column);
+        }
+      }
+    } finally {
+      setUploading(false);
+      editorInstance.focus();
+    }
+  };
 
   const getEditorAndSelection = () => {
     const editorInstance = editorRef.current;
@@ -312,27 +350,13 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
     const label = t("markdown_editor.toolbar.upload_image");
     
     const upChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const files = event.currentTarget.files;
-      if (!files) return;
-
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.size > 5 * 1024000) {
-          showAlert(t("upload.failed$size", { size: 5 }));
-          uploadRef.current!.value = "";
-        } else {
-          const editor = editorRef.current;
-          if (!editor) return;
-          const selection = editor.getSelection();
-          if (!selection) return;
-          setUploading(true);
-          void insertImage(file, selection, showAlert).finally(() => {
-            setUploading(false);
-          });
-        }
-      }
+      // Copy File objects out first; clearing input.value empties the live FileList.
+      const files = Array.from(event.currentTarget.files ?? []);
+      event.currentTarget.value = "";
+      if (files.length === 0) return;
+      void insertImagesSequentially(files, showAlert);
     };
-    
+
     return (
       <>
         <input
@@ -340,7 +364,8 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           onChange={upChange}
           className="hidden"
           type="file"
-          accept="image/gif,image/jpeg,image/jpg,image/png"
+          accept="image/*"
+          multiple
         />
         <MarkdownToolButton
           label={label}
@@ -434,17 +459,9 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
             className={"relative min-h-0 overflow-hidden rounded-none border-0 bg-w"}
             onDrop={(e) => {
               e.preventDefault();
-              const editor = editorRef.current;
-              if (!editor) return;
-              for (let i = 0; i < e.dataTransfer.files.length; i++) {
-                const selection = editor.getSelection();
-                if (!selection) return;
-                const file = e.dataTransfer.files[i];
-                setUploading(true);
-                void insertImage(file, selection, showAlert).finally(() => {
-                  setUploading(false);
-                });
-              }
+              const files = e.dataTransfer.files;
+              if (!files || files.length === 0) return;
+              void insertImagesSequentially(files, showAlert);
             }}
             onPaste={handlePaste}
           >
