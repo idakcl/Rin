@@ -74,6 +74,7 @@
       return c.json({ error: 'not found' }, 404);
   }
   ```
+- **已移除底部版权栏**：页脚 `© Powered by Rin` 署名已删除（`client/src/components/footer.tsx`）。原绑在该文字上的「双击 3 次跳转登录」隐藏入口已**移至整个 footer 区域**，仅在 `login.enabled=false`（隐身模式）时生效——在页面底部区域连点 3 次双击即可跳转到登录页，登录后即为管理员。
 
 ## 测试
 
