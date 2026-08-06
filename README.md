@@ -120,6 +120,19 @@ The deployment script will automatically:
 - Build and deploy frontend to Pages
 - Run database migrations
 
+### Deployment notes (avoid conflicts with existing resources)
+
+The repo has no `wrangler.toml` at root; resource names are determined by environment variables (see `.github/workflows/deploy.yml`). If your Cloudflare account already has resources with the same name, note the following:
+
+| Resource | Default name | Override variable (Actions Variables) | Notes |
+|----------|--------------|---------------------------------------|-------|
+| Workers backend | `rin-server` | `WORKER_NAME` | A name clash in the same account does **not** error—Wrangler updates in place; the real risk is overwriting the existing code. To keep the old Worker, use a new name (e.g., `rinx-server`) |
+| D1 database | `rin` | `DB_NAME` | A matching name **reuses** the existing database (which may carry old data). For a clean fresh blog, use a new name (e.g., `rinx`) or delete the old DB before deploying |
+| R2 bucket | unset (not auto-created) | `R2_BUCKET_NAME` | Once set, deploy derives the `S3_*` config; prefer a dedicated new bucket name to avoid mixing |
+
+- **Build phase won't clash**: the CI Build workflow runs `wrangler deploy --dry-run`, which only type-checks and builds artifacts—it never touches Cloudflare, so there is no naming conflict.
+- How to set: add the corresponding variable at `Settings → Secrets and variables → Actions → Variables`. No code changes needed.
+
 ### GitHub Actions Workflows
 
 The repository includes several automated workflows:

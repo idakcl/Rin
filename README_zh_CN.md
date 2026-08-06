@@ -120,6 +120,19 @@ bun run deploy:client
 - 构建前端并将其部署到 Pages
 - 运行数据库迁移
 
+### 部署注意事项（避开已有资源冲突）
+
+仓库根没有 `wrangler.toml`，部署资源名由环境变量决定（见 `.github/workflows/deploy.yml`）。若你的 Cloudflare 账号已有同名资源，需注意：
+
+| 资源 | 默认名 | 覆盖变量（Actions Variables） | 说明 |
+|------|--------|-------------------------------|------|
+| Workers 后端 | `rin-server` | `WORKER_NAME` | 同账号重名不会报错，Wrangler 就地更新；风险是覆盖原有代码。想保留旧 Worker，改成新名（如 `rinx-server`） |
+| D1 数据库 | `rin` | `DB_NAME` | 同名会复用已有库（可能带旧数据）。全新博客要干净库，改成新名（如 `rinx`）或删掉旧库再部署 |
+| R2 存储桶 | 未设置（不自动建） | `R2_BUCKET_NAME` | 设置后自动推导 `S3_*`；建议指定新桶名避免混用 |
+
+- **Build 阶段不会冲突**：CI 的 Build 工作流跑 `wrangler deploy --dry-run`，只做类型检查与构建产物，不连接 Cloudflare，不存在命名冲突。
+- 设置方式：仓库 `Settings → Secrets and variables → Actions → Variables` 添加对应变量即可，无需改代码。
+
 ### GitHub Actions Workflows
 
 存储库包含多个自动化工作流程：
