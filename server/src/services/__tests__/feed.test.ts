@@ -159,7 +159,10 @@ describe('FeedService', () => {
             const createData = await createRes.json() as any;
             const feedId = createData.insertedId;
             
-            const getRes = await app.request(`/${feedId}`, { method: 'GET' }, env);
+            const getRes = await app.request(`/${feedId}`, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer mock_token_1' },
+            }, env);
             
             expect(getRes.status).toBe(200);
             const data = await getRes.json() as any;
@@ -201,7 +204,10 @@ describe('FeedService', () => {
             expect(secondRes.status).toBe(200);
             const secondData = await secondRes.json() as any;
 
-            const getRes = await app.request(`/${secondData.insertedId}`, { method: 'GET' }, env);
+            const getRes = await app.request(`/${secondData.insertedId}`, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer mock_token_1' },
+            }, env);
 
             expect(getRes.status).toBe(200);
             const data = await getRes.json() as any;
@@ -257,7 +263,10 @@ describe('FeedService', () => {
             }, env);
 
             const createData = await createRes.json() as any;
-            const getRes = await app.request(`/${createData.insertedId}`, { method: 'GET' }, env);
+            const getRes = await app.request(`/${createData.insertedId}`, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer mock_token_1' },
+            }, env);
 
             expect(getRes.status).toBe(200);
             const data = await getRes.json() as any;
@@ -269,6 +278,29 @@ describe('FeedService', () => {
             const res = await app.request('/9999', { method: 'GET' }, env);
             
             expect(res.status).toBe(404);
+        });
+
+        it('should return 404 for numeric id when accessed by non-admin', async () => {
+            // 验证「屏蔽数字 id 公网访问」：已发布文章，非管理员用纯数字 id 访问应返回 404
+            const createRes = await app.request('/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer mock_token_1',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    title: 'Hidden Feed',
+                    content: 'Hidden Content',
+                    listed: true,
+                    draft: false,
+                    tags: [],
+                }),
+            }, env);
+            expect(createRes.status).toBe(200);
+            const createData = await createRes.json() as any;
+
+            const getRes = await app.request(`/${createData.insertedId}`, { method: 'GET' }, env);
+            expect(getRes.status).toBe(404);
         });
 
         it('should bypass stale public cache when cache is disabled', async () => {
@@ -307,7 +339,10 @@ describe('FeedService', () => {
                 user: { id: 1, username: 'testuser', avatar: 'avatar.png' },
             });
 
-            const getRes = await app.request(`/${createData.insertedId}`, { method: 'GET' }, env);
+            const getRes = await app.request(`/${createData.insertedId}`, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer mock_token_1' },
+            }, env);
             const data = await getRes.json() as any;
 
             expect(data.title).toBe('Fresh Feed');
@@ -427,7 +462,10 @@ describe('FeedService', () => {
             expect(updateRes.status).toBe(200);
             
             // Verify update
-            const getRes = await app.request(`/${feedId}`, { method: 'GET' }, env);
+            const getRes = await app.request(`/${feedId}`, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer mock_token_1' },
+            }, env);
             const data = await getRes.json() as any;
             expect(data.title).toBe('Updated Title');
         });
@@ -481,7 +519,10 @@ describe('FeedService', () => {
             expect(aliasData.title).toBe('Alias Title Updated');
             expect(aliasData.content).toBe('Updated alias content');
 
-            const idRes = await app.request(`/${feedId}`, { method: 'GET' }, env);
+            const idRes = await app.request(`/${feedId}`, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer mock_token_1' },
+            }, env);
             expect(idRes.status).toBe(200);
             expect(((await idRes.json()) as any).content).toBe('Updated alias content');
         });
