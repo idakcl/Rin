@@ -594,8 +594,10 @@ function CommentItem({
   const { showAlert, AlertUI } = useAlert();
   const { t } = useTranslation();
   const profile = useContext(ProfileContext);
+  const siteConfig = useSiteConfig();
   const commenterName = comment.user?.username || comment.guestName || t("anonymous");
-  const commenterAvatar = comment.user?.avatar || "/avatar.png";
+  // 登录用户用其头像；游客（无 user）默认使用网站图片
+  const commenterAvatar = comment.user?.avatar || siteConfig.avatar || "/avatar.png";
   function deleteComment() {
     showConfirm(
       t("delete.comment.title"),
