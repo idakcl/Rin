@@ -38,7 +38,7 @@ https://xeu.life
 
 ## This Fork: Random Feed URLs (anti-enumeration)
 
-This fork (of openRin/Rin) hardens article links: **publishing a post auto-generates a 10-character random alias, so the address looks like `https://yourdomain/feed/aZ3kPq9xY2` and cannot be guessed sequentially** (the original uses `/feed/1`, `/feed/2`… which are enumerable).
+This fork (of openRin/Rin) hardens article links: **publishing a post auto-generates a 16-character random alias, so the address looks like `https://yourdomain/feed/aZ3kPq9xY2Wn4mR7t` and cannot be guessed sequentially** (the original uses `/feed/1`, `/feed/2`… which are enumerable).
 
 | Role | Visit `/feed/<random>` | Visit `/feed/<number>` |
 |------|------------------------|------------------------|

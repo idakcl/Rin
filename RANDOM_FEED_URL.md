@@ -6,7 +6,7 @@
 
 | # | 改动 | 文件 | 行为 |
 |---|------|------|------|
-| 1 | 发文章自动生成随机 alias | `server/src/services/feed.ts` | 新建文章时若未手动指定 `alias`，自动生成 10 位 base62 随机串（含字母，避免纯数字被误判为 id） |
+| 1 | 发文章自动生成随机 alias | `server/src/services/feed.ts` | 新建文章时若未手动指定 `alias`，自动生成 16 位 base62 随机串（含字母，避免纯数字被误判为 id） |
 | 2 | 屏蔽纯数字 id 的公网访问 | `server/src/services/feed.ts` | 普通访客用纯数字 `/feed/4` 访问直接返回 404；**管理员仍可用数字 id**（后台管理方便） |
 | 3 | 订阅源链接改用 alias | `server/src/services/rss.ts` | RSS / Atom / JSON Feed 的 `id` 与 `link` 均使用随机 alias，列表里不再出现数字痕迹 |
 | 4 | 前端链接统一走 alias | `client/src/components/feed_card.tsx`、`client/src/page/writing.tsx`、`client/src/page/timeline.tsx`、`client/src/components/adjacent_feed.tsx` | 卡片、时间线、上一篇/下一篇、发布/更新后跳转，全部指向 `/feed/<alias>` |
@@ -49,11 +49,11 @@
 
 5. **发布第一篇文章**
    - 后台写文章并发布，系统会自动分配随机 alias；
-   - 文章地址形如 `https://你的域名/feed/aZ3kPq9xY2`，无法被顺序猜测。
+   - 文章地址形如 `https://你的域名/feed/aZ3kPq9xY2Wn4mR7t`，无法被顺序猜测。
 
 ## 自定义
 
-- **alias 长度 / 字符集**：修改 `server/src/services/feed.ts` 中的 `generateRandomAlias(len = 10)`。
+- **alias 长度 / 字符集**：修改 `server/src/services/feed.ts` 中的 `generateRandomAlias(len = 16)`。
 - **手动指定 slug**：发文章时在 `alias` 字段填入自定义短链（如 `my-post`），会优先于自动生成的随机串。
 - **放开数字 id 公网访问**：若不需要拦截，删除 `server/src/services/feed.ts` 中 `GET /:id` 路由里的
   ```ts

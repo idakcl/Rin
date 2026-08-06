@@ -11,8 +11,8 @@ import { bindTagToPost } from "./tag";
 import { clearFeedCache } from "./clear-feed-cache";
 export { clearFeedCache } from "./clear-feed-cache";
 
-// 生成 10 位 base62 随机串（含字母，避免纯数字被当 id 误判）
-function generateRandomAlias(len = 10): string {
+// 生成 16 位 base62 随机串（含字母，避免纯数字被当 id 误判）
+function generateRandomAlias(len = 16): string {
     const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     const bytes = crypto.getRandomValues(new Uint8Array(len));
     let out = '';
