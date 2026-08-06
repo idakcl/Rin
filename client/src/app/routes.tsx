@@ -85,7 +85,7 @@ export function AppRoutes() {
       </AdminRoute>
 
       <AdminRoute path="/admin/writing/:id" requirePermission title={t("writing")} description={t("admin.writing_description")}>
-        {({ id }) => <WritingPage id={tryInt(0, id)} />}
+        {({ id }) => <WritingPage key={id} id={tryInt(0, id)} />}
       </AdminRoute>
 
       <AppRoute path="/callback">

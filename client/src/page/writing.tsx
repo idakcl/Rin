@@ -183,24 +183,26 @@ export function WritingPage({ id }: { id?: number }) {
   }
 
   useEffect(() => {
-    if (id) {
-      client.feed
-        .get(id)
-        .then(({ data }) => {
-          if (data) {
-            if (title == "" && data.title) setTitle(data.title);
-            if (tags == "" && Array.isArray(data.hashtags))
-              setTags(data.hashtags.map(({ name }: {name: string}) => `#${name}`).join(" "));
-            if (alias == "" && (data as any).alias) setAlias((data as any).alias);
-            if (content == "") setContent(data.content);
-            if (summary == "") setSummary((data as any).summary || "");
-            setListed((data as any).listed === 1);
-            setDraft((data as any).draft === 1);
-            setCreatedAt(new Date(data.createdAt));
-          }
-        });
-    }
-  }, []);
+    if (id === undefined) return;
+    let cancelled = false;
+    client.feed
+      .get(id)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        // 始终以服务端已保存内容为准回填：避免组件实例复用 / 本地缓存残留
+        // 导致编辑框显示上一次文章或陈旧内容（“乱了”的根因）
+        setTitle(data.title ?? "");
+        if (Array.isArray(data.hashtags))
+          setTags(data.hashtags.map(({ name }: {name: string}) => `#${name}`).join(" "));
+        setAlias((data as any).alias ?? "");
+        setContent(data.content ?? "");
+        setSummary((data as any).summary ?? "");
+        setListed((data as any).listed === 1);
+        setDraft((data as any).draft === 1);
+        setCreatedAt(new Date(data.createdAt));
+      });
+    return () => { cancelled = true; };
+  }, [id]);
   const debouncedUpdate = useCallback(
     _.debounce(() => {
       mermaid.initialize({
