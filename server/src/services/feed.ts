@@ -11,6 +11,16 @@ import { bindTagToPost } from "./tag";
 import { clearFeedCache } from "./clear-feed-cache";
 export { clearFeedCache } from "./clear-feed-cache";
 
+// 生成 10 位 base62 随机串（含字母，避免纯数字被当 id 误判）
+function generateRandomAlias(len = 10): string {
+    const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const bytes = crypto.getRandomValues(new Uint8Array(len));
+    let out = '';
+    for (let i = 0; i < len; i++) out += alphabet[bytes[i] % alphabet.length];
+    return out;
+}
+
+
 // Lazy-loaded modules for WordPress import
 let XMLParser: any;
 let html2md: any;
@@ -175,12 +185,12 @@ export function FeedService(): Hono<{
             ai_summary_status: "idle",
             ai_summary_error: "",
             uid,
-            alias,
+            alias: alias || generateRandomAlias(),
             listed: listed ? 1 : 0,
             draft: draft ? 1 : 0,
             createdAt: date,
             updatedAt: date
-        }).returning({ insertedId: feeds.id }));
+        }).returning({ insertedId: feeds.id, alias: feeds.alias }));
 
         await profileAsync(c, 'feed_create_tags', () => bindTagToPost(db, result[0].insertedId, tags));
         await profileAsync(c, 'feed_create_ai_queue', () => syncFeedAISummaryQueueState(db, serverConfig, env, result[0].insertedId, {

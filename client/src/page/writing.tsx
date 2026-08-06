@@ -59,7 +59,7 @@ async function publish({
   if (data) {
     showAlert(t("publish.success"), () => {
       Cache.with().clear();
-      window.location.href = "/feed/" + data.insertedId;
+      window.location.href = "/feed/" + (data.alias || data.insertedId);
     });
   }
 }
@@ -111,7 +111,7 @@ async function update({
   } else {
     showAlert(t("update.success"), () => {
       Cache.with(id).clear();
-      window.location.href = "/feed/" + id;
+      window.location.href = "/feed/" + (alias || id);
     });
   }
 }

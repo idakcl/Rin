@@ -89,6 +89,7 @@ export type FeedCardProps = {
     draft?: number;
     listed?: number;
     top?: number;
+    alias?: string;
     title: string;
     summary: string;
     hashtags?: { id: number, name: string }[];
@@ -140,5 +141,5 @@ export function FeedCard({ id, title, avatar, draft, listed, top, summary, hasht
         </div>
     );
 
-    return preview ? body : <Link href={`/feed/${id}`} target="_blank" className="block w-full">{body}</Link>;
+    return preview ? body : <Link href={`/feed/${alias || id}`} target="_blank" className="block w-full">{body}</Link>;
 }
