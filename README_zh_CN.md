@@ -36,13 +36,26 @@ https://xeu.life
 - **类型安全**：通过 `@rin/api` 包在客户端和服务器之间共享 TypeScript 类型，实现端到端类型安全。
 - ……更多功能请访问 https://xeu.life 探索。
 
+## 本分支特性：随机 Feed URL（防顺序枚举）
+
+本分支（fork 自 openRin/Rin）对文章链接做了加固：**发布文章会自动生成 10 位随机 alias，文章地址形如 `https://你的域名/feed/aZ3kPq9xY2`，无法被顺序猜测**（原版 URL 为 `/feed/1`、`/feed/2`…… 可枚举）。
+
+| 角色 | 访问 `/feed/<随机串>` | 访问 `/feed/<数字>` |
+|------|----------------------|---------------------|
+| 访客（非管理员） | ✅ 正常打开 | ❌ 404 |
+| 管理员 | ✅ 正常打开 | ✅ 正常打开（后台可用） |
+
+- 订阅源（RSS / Atom / JSON Feed）中的条目链接也统一为随机 alias，列表里不会出现数字痕迹。
+- 如需手动指定短链，发布时填写 `alias` 字段即可（如 `my-post`）。
+- 完整改动说明、自定义方法与部署步骤见 [RANDOM_FEED_URL.md](./RANDOM_FEED_URL.md)。
+
 ## 文档
 
 ### 快速开始
 
 ```bash
-# 1. 克隆仓库
-git clone https://github.com/openRin/Rin.git && cd Rin
+# 1. 克隆仓库（本分支：随机 Feed URL 版）
+git clone https://github.com/idakcl/rinxfeedbuddy.git && cd rinxfeedbuddy
 
 # 2. 安装依赖
 bun install
