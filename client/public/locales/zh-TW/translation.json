@@ -160,7 +160,8 @@
       "ordered_list": "有序列表",
       "quote": "引用",
       "unordered_list": "無序列表",
-      "upload_image": "上傳圖片"
+      "upload_image": "上傳圖片",
+      "upload_video": "上傳影片"
     }
   },
   "error": {
@@ -556,7 +557,11 @@
       "preview_alt": "圖片預覽",
       "url_placeholder": "填寫圖片 URL，或上傳一張圖片"
     },
-    "title": "上傳"
+    "title": "上傳",
+    "video": {
+      "invalid_type": "請上傳影片檔案"
+    },
+    "unsupported_type": "不支援的檔案類型（僅支援圖片與影片）"
   },
   "uploading": "上傳中",
   "url": "網站 URL",

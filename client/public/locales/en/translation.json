@@ -160,7 +160,8 @@
       "ordered_list": "Ordered list",
       "quote": "Quote",
       "unordered_list": "Unordered list",
-      "upload_image": "Upload image"
+      "upload_image": "Upload image",
+      "upload_video": "Upload Video"
     }
   },
   "error": {
@@ -556,7 +557,11 @@
       "preview_alt": "Image preview",
       "url_placeholder": "Enter an image URL, or upload an image"
     },
-    "title": "Upload"
+    "title": "Upload",
+    "video": {
+      "invalid_type": "Please upload a video file"
+    },
+    "unsupported_type": "Unsupported file type (only images and videos allowed)"
   },
   "uploading": "Uploading...",
   "url": "Site URL",

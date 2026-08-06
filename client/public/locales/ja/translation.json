@@ -160,7 +160,8 @@
       "ordered_list": "番号付きリスト",
       "quote": "引用",
       "unordered_list": "箇条書き",
-      "upload_image": "画像をアップロード"
+      "upload_image": "画像をアップロード",
+      "upload_video": "動画をアップロード"
     }
   },
   "error": {
@@ -547,7 +548,11 @@
       "preview_alt": "画像プレビュー",
       "url_placeholder": "画像 URL を入力するか、画像をアップロードしてください"
     },
-    "title": "アップロード"
+    "title": "アップロード",
+    "video": {
+      "invalid_type": "動画ファイルをアップロードしてください"
+    },
+    "unsupported_type": "未対応のファイル形式（画像と動画のみ）"
   },
   "uploading": "アップロード中",
   "url": "サイトURL",

@@ -160,7 +160,8 @@
       "ordered_list": "有序列表",
       "quote": "引用",
       "unordered_list": "无序列表",
-      "upload_image": "上传图片"
+      "upload_image": "上传图片",
+      "upload_video": "上传视频"
     }
   },
   "error": {
@@ -556,7 +557,11 @@
       "preview_alt": "图片预览",
       "url_placeholder": "填写图片 URL，或上传一张图片"
     },
-    "title": "上传"
+    "title": "上传",
+    "video": {
+      "invalid_type": "请上传视频文件"
+    },
+    "unsupported_type": "不支持的文件类型（仅支持图片和视频）"
   },
   "uploading": "上传中",
   "url": "站点 URL",

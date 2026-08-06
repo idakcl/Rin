@@ -51,9 +51,14 @@ jobs:
           echo "${{ github.event.pull_request.head.sha || github.sha }}" > ./build-meta/head_sha
           echo "$DEPLOY_SCRIPT_HASH" > ./build-meta/deploy_script_hash
 
-      # Build client (no env vars needed, config is fetched from server at runtime)
-      # Note: vite.config.ts builds directly to ../dist/client
+      # Build client. VITE_* vars are inlined into the client bundle at build
+      # time, so the netpan upload token (VITE_NETPAN_UPLOAD_TOKEN) must be
+      # passed here from the repository secret. If the secret is absent the
+      # build still succeeds and the video-upload button simply stays inert
+      # until the secret is added and the Build is re-run.
       - name: Build client
+        env:
+          VITE_NETPAN_UPLOAD_TOKEN: ${{ secrets.VITE_NETPAN_UPLOAD_TOKEN }}
         run: |
           cd client
           bun run build

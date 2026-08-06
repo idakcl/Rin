@@ -1,5 +1,6 @@
 import { client } from "../app/runtime";
 import { encodeBlurhash } from "./blurhash";
+import { NETPAN_UPLOAD_URL, NETPAN_UPLOAD_TOKEN, NETPAN_BASE_URL } from "../netpan";
 
 export const DEFAULT_IMAGE_MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -24,6 +25,10 @@ type MarkdownImageMetadataResult = {
 
 export function isImageFile(file: File) {
   return file.type.startsWith("image/");
+}
+
+export function isVideoFile(file: File) {
+  return file.type.startsWith("video/");
 }
 
 function toPositiveInteger(value?: string | null) {
@@ -81,6 +86,13 @@ export function buildMarkdownImage(fileName: string, url: string, metadata: Imag
   const safeAlt = fileName.replace(/[[\]]/g, "");
   const safeUrl = url.replace(/\s/g, "%20");
   return `![${safeAlt}](${attachImageMetadataToUrl(safeUrl, metadata)})\n`;
+}
+
+// Raw <video> block for the markdown editor. Wrapped in blank lines so the
+// rehype-raw renderer treats it as a block-level element.
+export function buildMarkdownVideo(_fileName: string, url: string) {
+  const safeUrl = url.replace(/\s/g, "%20");
+  return `\n<video src="${safeUrl}" controls style="max-width:100%"></video>\n`;
 }
 
 async function loadImage(file: File) {
@@ -276,4 +288,43 @@ export async function uploadImageFile(file: File): Promise<UploadedImageResult> 
     url,
     ...(metadataResult.status === "fulfilled" ? metadataResult.value : {}),
   };
+}
+
+// Upload a video file directly to the user's private netpan (Sanyue ImgHub /
+// CloudFlare-ImgBed) and return the public URL. The endpoint accepts a
+// multipart `file` field and an `Authorization: Bearer <token>` header, and
+// responds with a JSON array like [{ src: "/file/xxx", publicUrl: "https://..." }].
+export async function uploadVideoToNetpan(file: File): Promise<string> {
+  if (!NETPAN_UPLOAD_TOKEN) {
+    throw new Error("未配置 netpan 上传 Token：请在仓库 Secrets 中添加 VITE_NETPAN_UPLOAD_TOKEN（需 upload 权限），并重新运行 Build");
+  }
+
+  const form = new FormData();
+  form.append("file", file);
+
+  const response = await fetch(NETPAN_UPLOAD_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${NETPAN_UPLOAD_TOKEN}`,
+    },
+    body: form,
+  });
+
+  if (!response.ok) {
+    let detail = "";
+    try {
+      detail = (await response.text()).slice(0, 120);
+    } catch {
+      // ignore
+    }
+    throw new Error(`netpan 上传失败 (${response.status})${detail ? `: ${detail}` : ""}`);
+  }
+
+  const data = await response.json();
+  const item = Array.isArray(data) ? data[0] : data;
+  const raw = item?.publicUrl || item?.src;
+  if (!raw) {
+    throw new Error("netpan 返回缺少文件 URL");
+  }
+  return raw.startsWith("http") ? raw : `${NETPAN_BASE_URL}${raw}`;
 }

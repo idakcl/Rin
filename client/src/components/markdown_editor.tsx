@@ -6,7 +6,8 @@ import Loading from 'react-loading';
 import { FlatInset, FlatTabButton } from "@rin/ui";
 import { useAlert } from "./dialog";
 import { useColorMode } from "../utils/darkModeUtils";
-import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE } from "../utils/image-upload";
+import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE, isVideoFile, buildMarkdownVideo, uploadVideoToNetpan } from "../utils/image-upload";
+import { NETPAN_MAX_FILE_SIZE } from "../netpan";
 import { Markdown } from "./markdown";
 
 
@@ -101,10 +102,27 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
     }
   }
 
-  // Upload and insert multiple images one by one, advancing the cursor after
-  // each image so they stack vertically instead of overlapping at one position.
-  const insertImagesSequentially = async (
+  // Insert a raw snippet (markdown/HTML) at the given range and return the
+  // cursor position right after it, so callers can chain multiple inserts.
+  const insertSnippetAtCursor = (
+    text: string,
+    range: NonNullable<ReturnType<editor.IStandaloneCodeEditor["getSelection"]>>,
+  ): EditorPosition | undefined => {
+    const editorInstance = editorRef.current;
+    if (!editorInstance) return undefined;
+    editorInstance.executeEdits(undefined, [{ range, text }]);
+    editorInstance.focus();
+    return positionAfterText(range.startLineNumber, range.startColumn, text);
+  };
+
+  // Upload and insert multiple media files one by one. `validate` returns an
+  // error message (or null) per file; `produce` returns the markdown/HTML
+  // snippet for an already-uploaded file. The cursor advances after each insert
+  // so files stack vertically instead of overlapping at one position.
+  const insertMediaSequentially = async (
     files: FileList | File[],
+    validate: (file: File) => string | null,
+    produce: (file: File) => Promise<string>,
     showAlert: (msg: string) => void,
   ) => {
     const editorInstance = editorRef.current;
@@ -116,17 +134,19 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
     setUploading(true);
     try {
       for (const file of Array.from(files)) {
-        if (!isImageFile(file)) {
-          showAlert(t("upload.image.invalid_type"));
+        const error = validate(file);
+        if (error) {
+          showAlert(error);
           continue;
         }
-        if (file.size > DEFAULT_IMAGE_MAX_FILE_SIZE) {
-          showAlert(t("upload.failed$size", { size: Math.round(DEFAULT_IMAGE_MAX_FILE_SIZE / 1024 / 1024) }));
-          continue;
-        }
-        const next = await insertImage(file, cursor, showAlert);
-        if (next) {
-          cursor = new Selection(next.lineNumber, next.column, next.lineNumber, next.column);
+        try {
+          const snippet = await produce(file);
+          const next = insertSnippetAtCursor(snippet, cursor);
+          if (next) {
+            cursor = new Selection(next.lineNumber, next.column, next.lineNumber, next.column);
+          }
+        } catch (e) {
+          showAlert(e instanceof Error ? e.message : t("upload.failed"));
         }
       }
     } finally {
@@ -348,13 +368,28 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
   function UploadImageButton() {
     const uploadRef = useRef<HTMLInputElement>(null);
     const label = t("markdown_editor.toolbar.upload_image");
-    
+
     const upChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      // Copy File objects out first; clearing input.value empties the live FileList.
       const files = Array.from(event.currentTarget.files ?? []);
       event.currentTarget.value = "";
       if (files.length === 0) return;
-      void insertImagesSequentially(files, showAlert);
+      void insertMediaSequentially(
+        files,
+        (file) => {
+          if (!isImageFile(file)) return t("upload.image.invalid_type");
+          if (file.size > DEFAULT_IMAGE_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(DEFAULT_IMAGE_MAX_FILE_SIZE / 1024 / 1024) });
+          return null;
+        },
+        async (file) => {
+          const result = await uploadImageFile(file);
+          return buildMarkdownImage(file.name, result.url, {
+            blurhash: result.blurhash,
+            width: result.width,
+            height: result.height,
+          });
+        },
+        showAlert,
+      );
     };
 
     return (
@@ -370,6 +405,49 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
         <MarkdownToolButton
           label={label}
           icon="ri-image-add-line"
+          disabled={uploading}
+          onClick={() => uploadRef.current?.click()}
+        />
+      </>
+    );
+  }
+
+  function UploadVideoButton() {
+    const uploadRef = useRef<HTMLInputElement>(null);
+    const label = t("markdown_editor.toolbar.upload_video");
+
+    const upChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(event.currentTarget.files ?? []);
+      event.currentTarget.value = "";
+      if (files.length === 0) return;
+      void insertMediaSequentially(
+        files,
+        (file) => {
+          if (!isVideoFile(file)) return t("upload.video.invalid_type");
+          if (file.size > NETPAN_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(NETPAN_MAX_FILE_SIZE / 1024 / 1024) });
+          return null;
+        },
+        async (file) => {
+          const url = await uploadVideoToNetpan(file);
+          return buildMarkdownVideo(file.name, url);
+        },
+        showAlert,
+      );
+    };
+
+    return (
+      <>
+        <input
+          ref={uploadRef}
+          onChange={upChange}
+          className="hidden"
+          type="file"
+          accept="video/*"
+          multiple
+        />
+        <MarkdownToolButton
+          label={label}
+          icon="ri-movie-line"
           disabled={uploading}
           onClick={() => uploadRef.current?.click()}
         />
@@ -445,6 +523,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           ))}
           <span className="mx-1 hidden h-6 w-px bg-black/10 dark:bg-white/10 sm:block" aria-hidden="true" />
           <UploadImageButton />
+          <UploadVideoButton />
         </div>
         {uploading &&
           <div className="flex flex-row items-center space-x-2 px-2">
@@ -461,7 +540,33 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
               e.preventDefault();
               const files = e.dataTransfer.files;
               if (!files || files.length === 0) return;
-              void insertImagesSequentially(files, showAlert);
+              void insertMediaSequentially(
+                files,
+                (file) => {
+                  if (isImageFile(file)) {
+                    if (file.size > DEFAULT_IMAGE_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(DEFAULT_IMAGE_MAX_FILE_SIZE / 1024 / 1024) });
+                    return null;
+                  }
+                  if (isVideoFile(file)) {
+                    if (file.size > NETPAN_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(NETPAN_MAX_FILE_SIZE / 1024 / 1024) });
+                    return null;
+                  }
+                  return t("upload.unsupported_type");
+                },
+                async (file) => {
+                  if (isImageFile(file)) {
+                    const result = await uploadImageFile(file);
+                    return buildMarkdownImage(file.name, result.url, {
+                      blurhash: result.blurhash,
+                      width: result.width,
+                      height: result.height,
+                    });
+                  }
+                  const url = await uploadVideoToNetpan(file);
+                  return buildMarkdownVideo(file.name, url);
+                },
+                showAlert,
+              );
             }}
             onPaste={handlePaste}
           >
