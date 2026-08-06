@@ -83,9 +83,9 @@ export function CommentService(): Hono {
                     webhookUrl || "",
                     {
                         event: "comment.created",
-                        message: `${frontendUrl}/feed/${feedId}\n${user.username} 评论了: ${exist.title}\n${content}`,
+                        message: `${frontendUrl}/feed/${exist.alias || feedId}\n${user.username} 评论了: ${exist.title}\n${content}`,
                         title: exist.title || "",
-                        url: `${frontendUrl}/feed/${feedId}`,
+                        url: `${frontendUrl}/feed/${exist.alias || feedId}`,
                         username: user.username,
                         content,
                     },
@@ -125,9 +125,9 @@ export function CommentService(): Hono {
                 webhookUrl || "",
                 {
                     event: "comment.created",
-                    message: `${frontendUrl}/feed/${feedId}\n游客 ${guestName} 评论了: ${exist.title}\n${content}`,
+                    message: `${frontendUrl}/feed/${exist.alias || feedId}\n游客 ${guestName} 评论了: ${exist.title}\n${content}`,
                     title: exist.title || "",
-                    url: `${frontendUrl}/feed/${feedId}`,
+                    url: `${frontendUrl}/feed/${exist.alias || feedId}`,
                     username: guestName,
                     content,
                 },

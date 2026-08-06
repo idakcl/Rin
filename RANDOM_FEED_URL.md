@@ -11,7 +11,7 @@
 | 3 | 订阅源链接改用 alias | `server/src/services/rss.ts` | RSS / Atom / JSON Feed 的 `id` 与 `link` 均使用随机 alias，列表里不再出现数字痕迹 |
 | 4 | 前端链接统一走 alias | `client/src/components/feed_card.tsx`、`client/src/page/writing.tsx`、`client/src/page/timeline.tsx`、`client/src/components/adjacent_feed.tsx` | 卡片、时间线、上一篇/下一篇、发布/更新后跳转，全部指向 `/feed/<alias>` |
 
-> 注：仅服务端内部 API（如 `/api/feed/<数字>`）保留数字 id，这是正常行为，不影响公网可枚举性。
+> 注：仅服务端内部 API（如 `/api/feed/<数字>`）保留数字 id，这是正常行为，不影响公网可枚举性。对外通知（Webhook 新评论提醒，`server/src/services/comments.ts`）也统一使用 alias 链接，不会泄露数字 id，且任何人可正常打开。
 
 ## 访问行为一览
 
