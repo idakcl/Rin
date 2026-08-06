@@ -300,8 +300,8 @@ class FeedAPI {
   }
 
   // POST /api/feed
-  async create(body: CreateFeedRequest): Promise<ApiResponse<{ insertedId: number }>> {
-    return this.http.post<{ insertedId: number }>("/api/feed", body);
+  async create(body: CreateFeedRequest): Promise<ApiResponse<{ insertedId: number; alias?: string }>> {
+    return this.http.post<{ insertedId: number; alias?: string }>("/api/feed", body);
   }
 
   // POST /api/feed/:id
