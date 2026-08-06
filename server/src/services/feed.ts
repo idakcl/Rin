@@ -216,6 +216,10 @@ export function FeedService(): Hono<{
         const uid = c.get('uid');
         const id = c.req.param('id');
         const id_num = parseFeedId(id);
+        // 屏蔽数字 id 的公网访问：非管理员用纯数字 id 访问直接 404
+        if (id_num !== null && !admin) {
+            return c.json({ error: 'not found' }, 404);
+        }
         const cacheKey = id_num === null ? `feed_alias_${id}` : `feed_id_${id_num}`;
         const where = id_num === null ? eq(feeds.alias, id) : eq(feeds.id, id_num);
 
