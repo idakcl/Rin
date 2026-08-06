@@ -36,13 +36,26 @@ https://xeu.life
 - **Type Safety**: End-to-end type safety with shared TypeScript types between client and server via `@rin/api` package.
 - ...and more! Explore all features at https://xeu.life.
 
+## This Fork: Random Feed URLs (anti-enumeration)
+
+This fork (of openRin/Rin) hardens article links: **publishing a post auto-generates a 10-character random alias, so the address looks like `https://yourdomain/feed/aZ3kPq9xY2` and cannot be guessed sequentially** (the original uses `/feed/1`, `/feed/2`… which are enumerable).
+
+| Role | Visit `/feed/<random>` | Visit `/feed/<number>` |
+|------|------------------------|------------------------|
+| Visitor (non-admin) | ✅ Opens normally | ❌ 404 |
+| Admin | ✅ Opens normally | ✅ Opens normally (for backend use) |
+
+- Feed links in RSS / Atom / JSON Feed are also unified to the random alias—no numeric traces appear in listings.
+- To set a custom slug, fill in the `alias` field when publishing (e.g., `my-post`).
+- For full change notes, customization, and deployment steps, see [RANDOM_FEED_URL.md](./RANDOM_FEED_URL.md).
+
 ## Documentation
 
 ### Quick Start
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/openRin/Rin.git && cd Rin
+# 1. Clone the repository (this fork: random Feed URL edition)
+git clone https://github.com/idakcl/rinxfeedbuddy.git && cd rinxfeedbuddy
 
 # 2. Install dependencies
 bun install
