@@ -292,7 +292,7 @@ export function FeedPage({ id, TOC, clean }: { id: string, TOC: () => JSX.Elemen
                   )}
                   <div className="flex flex-row items-center">
                     <img
-                      src={feed.user.avatar || "/avatar.png"}
+                      src={feed.user.avatar || "/favicon.png"}
                       className="w-8 h-8 rounded-full"
                     />
                     <div className="ml-2">
@@ -596,8 +596,8 @@ function CommentItem({
   const profile = useContext(ProfileContext);
   const siteConfig = useSiteConfig();
   const commenterName = comment.user?.username || comment.guestName || t("anonymous");
-  // 登录用户用其头像；游客（无 user）默认使用网站图片
-  const commenterAvatar = comment.user?.avatar || siteConfig.avatar || "/avatar.png";
+  // 登录用户用其头像；游客（无 user）默认使用网站图标(favicon)，再兜底站点头像
+  const commenterAvatar = comment.user?.avatar || siteConfig.avatar || "/favicon.png";
   function deleteComment() {
     showConfirm(
       t("delete.comment.title"),
