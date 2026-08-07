@@ -1,72 +1,76 @@
-import { useContext, useEffect, useRef, useState } from "react"
+import { useContext, useEffect, useRef } from "react"
 import { Helmet } from 'react-helmet'
 import { Link, useSearch } from "wouter"
 import { FeedCard } from "../components/feed_card"
 import { Waiting } from "../components/loading"
-import { client } from "../app/runtime"
 import { ProfileContext } from "../state/profile"
 
 import { useSiteConfig } from "../hooks/useSiteConfig";
 import { siteName } from "../utils/constants"
 import { tryInt } from "../utils/int"
 import { useTranslation } from "react-i18next";
-
-type FeedsData = {
-    size: number,
-    data: any[],
-    hasNext: boolean
-}
-
-type FeedType = 'draft' | 'unlisted' | 'normal'
-
-type FeedsMap = {
-    [key in FeedType]: FeedsData
-}
+import { useInfiniteFeed, type FeedType } from "../hooks/useInfiniteFeed";
 
 export function FeedsPage() {
     const { t } = useTranslation()
     const siteConfig = useSiteConfig();
     const query = new URLSearchParams(useSearch());
     const profile = useContext(ProfileContext);
-    const [listState, _setListState] = useState<FeedType>(query.get("type") as FeedType || 'normal')
-    const [status, setStatus] = useState<'loading' | 'idle'>('idle')
-    const [feeds, setFeeds] = useState<FeedsMap>({
-        draft: { size: 0, data: [], hasNext: false },
-        unlisted: { size: 0, data: [], hasNext: false },
-        normal: { size: 0, data: [], hasNext: false }
-    })
-    const page = tryInt(1, query.get("page"))
+    const type = ((query.get("type") as FeedType) || 'normal')
     const limit = tryInt(siteConfig.pageSize, query.get("limit"))
     const feedListClass = siteConfig.feedLayout === "masonry" ? "wauto columns-1 gap-5 ani-show md:columns-2" : "wauto flex flex-col ani-show";
-    const currentFeeds = feeds[listState] ?? { size: 0, data: [], hasNext: false };
-    const currentFeedData = Array.isArray(currentFeeds.data) ? currentFeeds.data : [];
-    const ref = useRef("")
-    function fetchFeeds(type: FeedType) {
-        client.feed.list({
-            page: page,
-            limit: limit,
-            type: type
-        }).then(({ data }) => {
-            if (data) {
-                setFeeds({
-                    ...feeds,
-                    [type]: data
-                })
-                setStatus('idle')
-            }
-        })
-    }
+    const {
+        items,
+        hasNext,
+        loading,
+        total,
+        loadInitial,
+        loadNext,
+        MAX_DEEPLINK_PAGES,
+    } = useInfiniteFeed(type, limit)
+
+    const sentinelRef = useRef<HTMLDivElement>(null)
+    // 永远指向最新的 loadNext，避免 IntersectionObserver 回调捕获到旧的闭包
+    const loadNextRef = useRef(loadNext)
+    loadNextRef.current = loadNext
+
+    // 初始加载 + 切换 type/limit 时重置重载
     useEffect(() => {
-        const key = `${query.get("page")} ${query.get("type")} ${limit}`
-        if (ref.current == key) return
-        const type = query.get("type") as FeedType || 'normal'
-        if (type !== listState) {
-            _setListState(type)
-        }
-        setStatus('loading')
-        fetchFeeds(type)
-        ref.current = key
-    }, [limit, query.get("page"), query.get("type")])
+        let cancelled = false
+        const page = tryInt(1, query.get("page"))
+        loadInitial().then(() => {
+            if (cancelled) return
+            // 深链 ?page=N：串行预热到该页（上限 MAX_DEEPLINK_PAGES），再粗略定位到底部
+            const target = Math.min(page, MAX_DEEPLINK_PAGES)
+            let chain: Promise<unknown> = Promise.resolve()
+            for (let i = 2; i <= target; i++) {
+                chain = chain.then(() => loadNext())
+            }
+            chain.then(() => {
+                if (cancelled) return
+                requestAnimationFrame(() => {
+                    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" })
+                })
+            })
+        })
+        return () => { cancelled = true }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loadInitial, query.get("page")])
+
+    // 抖音式：列表底部哨兵，进入视口前 800px 即触发下一页（数据若已预取则瞬时追加）
+    useEffect(() => {
+        const el = sentinelRef.current
+        if (!el || typeof IntersectionObserver === "undefined") return
+        const obs = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((e) => e.isIntersecting)) loadNextRef.current()
+            },
+            { rootMargin: "800px 0px" }
+        )
+        obs.observe(el)
+        return () => obs.disconnect()
+    }, [])
+
     return (
         <>
             <Helmet>
@@ -77,50 +81,54 @@ export function FeedsPage() {
                 <meta property="og:type" content="article" />
                 <meta property="og:url" content={document.URL} />
             </Helmet>
-            <Waiting for={feeds.draft.size + feeds.normal.size + feeds.unlisted.size > 0 || status === 'idle'}>
+            <Waiting for={!loading || items.length > 0}>
                 <main className="w-full flex flex-col justify-center items-center mb-8">
                     <div className="wauto text-start text-black dark:text-white py-4 text-4xl font-bold">
                         <p>
-                            {listState === 'draft' ? t('draft_bin') : listState === 'normal' ? t('article.title') : t('unlisted')}
+                            {type === 'draft' ? t('draft_bin') : type === 'normal' ? t('article.title') : t('unlisted')}
                         </p>
                         <div className="flex flex-row justify-between">
                             <p className="text-sm mt-4 text-neutral-500 font-normal">
-                                {t('article.total$count', { count: currentFeeds.size })}
+                                {t('article.total$count', { count: total })}
                             </p>
                             {profile?.permission &&
                                 <div className="flex flex-row space-x-4">
-                                    <Link href={listState === 'draft' ? '/?type=normal' : '/?type=draft'} className={`text-sm mt-4 text-neutral-500 font-normal ${listState === 'draft' ? "text-theme" : ""}`}>
+                                    <Link href={type === 'draft' ? '/?type=normal' : '/?type=draft'} className={`text-sm mt-4 text-neutral-500 font-normal ${type === 'draft' ? "text-theme" : ""}`}>
                                         {t('draft_bin')}
                                     </Link>
-                                    <Link href={listState === 'unlisted' ? '/?type=normal' : '/?type=unlisted'} className={`text-sm mt-4 text-neutral-500 font-normal ${listState === 'unlisted' ? "text-theme" : ""}`}>
+                                    <Link href={type === 'unlisted' ? '/?type=normal' : '/?type=unlisted'} className={`text-sm mt-4 text-neutral-500 font-normal ${type === 'unlisted' ? "text-theme" : ""}`}>
                                         {t('unlisted')}
                                     </Link>
                                 </div>
                             }
                         </div>
                     </div>
-                    <Waiting for={status === 'idle'}>
-                        <div className={feedListClass}>
-                            {currentFeedData.map(({ id, ...feed }: any) => (
-                                <FeedCard key={id} id={id} {...feed} />
-                            ))}
-                        </div>
-                        <div className="wauto flex flex-row items-center mt-4 ani-show">
-                            {page > 1 &&
-                                <Link href={`/?type=${listState}&page=${(page - 1)}`}
-                                    className={`text-sm font-normal rounded-full px-4 py-2 text-white bg-theme`}>
-                                    {t('previous')}
-                                </Link>
-                            }
-                            <div className="flex-1" />
-                            {currentFeeds.hasNext &&
-                                <Link href={`/?type=${listState}&page=${(page + 1)}`}
-                                    className={`text-sm font-normal rounded-full px-4 py-2 text-white bg-theme`}>
-                                    {t('next')}
-                                </Link>
-                            }
-                        </div>
-                    </Waiting>
+                    <div className={feedListClass}>
+                        {items.map(({ id, ...feed }: any) => (
+                            <FeedCard key={id} id={id} {...feed} />
+                        ))}
+                    </div>
+                    <div className="wauto flex flex-col items-center mt-4 ani-show">
+                        {/* 哨兵：进入视口附近即触发 loadNext */}
+                        <div ref={sentinelRef} className="h-10 w-full" aria-hidden="true" />
+                        {loading && (
+                            <span className="text-sm text-neutral-500 font-normal py-2">
+                                {t('loading')}
+                            </span>
+                        )}
+                        {!hasNext && items.length > 0 && (
+                            <div className="text-gray-500 pt-6">{t('no_more')}</div>
+                        )}
+                        {/* 不支持 IntersectionObserver 时的兜底：手动加载更多 */}
+                        {hasNext && typeof IntersectionObserver === "undefined" && (
+                            <button
+                                onClick={() => loadNext()}
+                                className="text-sm font-normal rounded-full px-4 py-2 text-white bg-theme mt-2"
+                            >
+                                {t('load_more')}
+                            </button>
+                        )}
+                    </div>
                 </main>
             </Waiting>
         </>
