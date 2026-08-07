@@ -210,7 +210,7 @@ function Friend({ friend }: { friend: FriendItem }) {
         <>
             <a title={friend.name} href={toAbsoluteUrl(friend.url)} target="_blank" className="bg-button w-full bg-w rounded-xl p-4 flex flex-col justify-center items-center relative">
                 <div className="w-16 h-16">
-                    <img className={"rounded-full " + (friend.health.length > 0 ? "grayscale" : "")} src={friend.avatar} alt={friend.name}
+                    <img className={"w-full h-full object-cover rounded-full " + (friend.health.length > 0 ? "grayscale" : "")} src={friend.avatar} alt={friend.name}
                         onError={(e) => {
                             let host = '';
                             let proto = 'https:';
@@ -275,7 +275,7 @@ function Friend({ friend }: { friend: FriendItem }) {
             >
                 <FlatPanel className="relative flex w-[80vw] flex-col items-center justify-start p-6 sm:w-[60vw] md:w-[50vw] lg:w-[40vw] xl:w-[30vw]">
                     <div className="w-16 h-16">
-                        <img className={"rounded-xl " + (friend.health.length > 0 ? "grayscale" : "")} src={friend.avatar} alt={friend.name} />
+                        <img className={"w-full h-full object-cover rounded-xl " + (friend.health.length > 0 ? "grayscale" : "")} src={friend.avatar} alt={friend.name} />
                     </div>
                     {profile?.permission &&
                         <div className="flex flex-col w-full items-start mt-4 px-4">
