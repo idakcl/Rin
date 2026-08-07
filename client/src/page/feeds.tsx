@@ -46,13 +46,12 @@ export function FeedsPage() {
         // 只触发一次且会被 loadInitial 的 flush 覆盖，导致预取的后续页永不追加。
         // 这里主动级联 loadNext，直到页面变高可滚动或 hasNext=false。
         const fillShortPage = () => {
-            if (cancelled || !hasNextRef.current) return
+            const W = (window as any).__dbg = (window as any).__dbg || []
+            if (cancelled || !hasNextRef.current) { W.push("fsp STOP hasNext=" + hasNextRef.current); return }
             const el = sentinelRef.current
-            if (!el) return
+            if (!el) { W.push("fsp NO EL"); return }
             const rect = el.getBoundingClientRect()
-            // 哨兵仍在「视口 + 800px 预触发区」内 → 页面太短、滚不动，主动级联。
-            // 注意：第一次 loadNext 可能被 loadInitial 期间 observer 误触发的 loadingRef 守卫拦掉，
-            // 因此无论本次 ok 与否都继续用 rAF 重试，直到页面变高可滚动或 hasNext=false。
+            W.push("fsp top=" + Math.round(rect.top) + " cond=" + (rect.top <= window.innerHeight + 800) + " hasNext=" + hasNextRef.current)
             if (rect.top <= window.innerHeight + 800) {
                 loadNext().then(() => requestAnimationFrame(fillShortPage))
             }

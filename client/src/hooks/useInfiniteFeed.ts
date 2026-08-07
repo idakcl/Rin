@@ -82,9 +82,11 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
 
   /** 追加下一页：命中 prefetchCache 则瞬时挂载，否则走网络。返回是否成功追加 */
   const loadNext = useCallback((): Promise<boolean> => {
-    if (loadingRef.current) return Promise.resolve(false)
+    const W = (window as any).__dbg = (window as any).__dbg || []
+    if (loadingRef.current) { W.push("ln BLOCKED loading=" + loadingRef.current); return Promise.resolve(false) }
     const target = bucketRef.current.nextPage
-    if (!bucketRef.current.hasNext) return Promise.resolve(false)
+    W.push("ln ENTER t=" + target + " hasNext=" + bucketRef.current.hasNext)
+    if (!bucketRef.current.hasNext) { W.push("ln NOHASNEXT"); return Promise.resolve(false) }
 
     loadingRef.current = true
     flush((prev) => ({ ...prev, loading: true }))
@@ -103,6 +105,7 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
         }
         const items = (data.data ?? []) as any[]
         const nextPage = target + 1
+        W.push("ln APPEND t=" + target + " items=" + items.length + " next=" + nextPage + " hasNext=" + data.hasNext)
         prefetchCache.current.delete(target)
         flush((prev) => ({
           items: [...prev.items, ...items],
