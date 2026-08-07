@@ -486,7 +486,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           onChange={upChange}
           className="hidden"
           type="file"
-          accept="audio/*"
+          accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.wma,.webm,.opus,.mid,.midi,.amr,.caf,.aiff,.ape"
           multiple
         />
         <MarkdownToolButton

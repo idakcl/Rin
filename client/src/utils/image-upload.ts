@@ -32,7 +32,11 @@ export function isVideoFile(file: File) {
 }
 
 export function isAudioFile(file: File) {
-  return file.type.startsWith("audio/");
+  if (file.type.startsWith("audio/")) return true;
+  // Fallback for environments that don't report a MIME type for audio files
+  // (e.g. some OS/browser combos leave .mp3 with an empty or generic type),
+  // so the file picker / validation still accepts them by extension.
+  return /\.(mp3|wav|ogg|m4a|aac|flac|wma|webm|opus|mid|midi|amr|caf|aiff|ape)$/i.test(file.name);
 }
 
 function toPositiveInteger(value?: string | null) {
