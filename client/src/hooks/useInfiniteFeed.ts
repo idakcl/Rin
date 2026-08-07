@@ -50,6 +50,11 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
   // 抢跑抓取第 1 页并 append 到 loadInitial 的 SET 结果之上，导致整页文章重复。
   const bootstrappedRef = useRef(false)
 
+  // [DEBUG] 追踪 loadInitial/loadNext 事件序列，定位重复渲染根因（定位后删除）
+  ;(window as any).__diag = (window as any).__diag || []
+  const D = (o: Record<string, unknown>) => { (window as any).__diag.push(o) }
+  D({ ev: "mount", limit, type })
+
   useEffect(() => {
     mounted.current = true
     return () => {
@@ -85,10 +90,11 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
 
   /** 追加下一页：命中 prefetchCache 则瞬时挂载，否则走网络。返回是否成功追加 */
   const loadNext = useCallback((): Promise<boolean> => {
-    if (!bootstrappedRef.current) return Promise.resolve(false)
-    if (loadingRef.current) return Promise.resolve(false)
+    D({ ev: "LN_entry", boot: bootstrappedRef.current, lr: loadingRef.current, tgt: bucketRef.current.nextPage, hn: bucketRef.current.hasNext })
+    if (!bootstrappedRef.current) { D({ ev: "LN_ret", why: "boot" }); return Promise.resolve(false) }
+    if (loadingRef.current) { D({ ev: "LN_ret", why: "lr" }); return Promise.resolve(false) }
     const target = bucketRef.current.nextPage
-    if (!bucketRef.current.hasNext) return Promise.resolve(false)
+    if (!bucketRef.current.hasNext) { D({ ev: "LN_ret", why: "hn" }); return Promise.resolve(false) }
 
     loadingRef.current = true
     flush((prev) => ({ ...prev, loading: true }))
@@ -108,13 +114,16 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
         const items = (data.data ?? []) as any[]
         const nextPage = target + 1
         prefetchCache.current.delete(target)
-        flush((prev) => ({
-          items: [...prev.items, ...items],
-          nextPage,
-          hasNext: data.hasNext,
-          loading: false,
-          total: data.size ?? prev.total,
-        }))
+        flush((prev) => {
+          D({ ev: "LN_flush", target, before: prev.items.length, after: prev.items.length + items.length })
+          return {
+            items: [...prev.items, ...items],
+            nextPage,
+            hasNext: data.hasNext,
+            loading: false,
+            total: data.size ?? prev.total,
+          }
+        })
         loadingRef.current = false
         // 挂载后，保证下面 2~3 页数据就绪（抖音式「下面几屏」）
         prefetch(nextPage)
@@ -134,6 +143,7 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
     fetching.current.clear()
     loadingRef.current = false
     bootstrappedRef.current = false
+    D({ ev: "LI_start", limit })
     flush(() => ({ items: [], nextPage: 1, hasNext: true, loading: true, total: 0 }))
     return client.feed
       .list({ page: 1, limit, type })
@@ -142,6 +152,7 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
           flush(() => ({ items: [], nextPage: 1, hasNext: false, loading: false, total: 0 }))
           return
         }
+        D({ ev: "LI_done", n: (data.data ?? []).length, nextPage: 2, hasNext: data.hasNext })
         flush(() => ({
           items: (data.data ?? []) as any[],
           nextPage: 2,
