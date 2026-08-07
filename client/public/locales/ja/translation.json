@@ -189,7 +189,8 @@
       "rejected": "拒否されました",
       "waiting": "審査待ち"
     },
-    "title": "友人"
+    "title": "友人",
+    "avatarHint": "空欄の場合は相手サイトのアイコンを自動取得"
   },
   "github_login": "Github ログイン",
   "hashtags": "ラベル",

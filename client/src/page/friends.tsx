@@ -110,6 +110,7 @@ export function FriendsPage() {
                                 <Input value={name} setValue={setName} placeholder={t('sitename')} variant="flat" />
                                 <Input value={desc} setValue={setDesc} placeholder={t('description')} variant="flat" className="mt-2" />
                                 <Input value={avatar} setValue={setAvatar} placeholder={t('avatar.url')} variant="flat" className="mt-2" />
+                                <p className="text-xs text-neutral-400 mt-1">{t('friends.avatarHint')}</p>
                                 <Input value={url} setValue={setUrl} placeholder={t('url')} variant="flat" className="my-2" />
                                 <div className='flex flex-row justify-center'>
                                     <button onClick={publishButton} className='basis-1/2 rounded-full bg-theme py-4 text-white'>{t('create.title')}</button>

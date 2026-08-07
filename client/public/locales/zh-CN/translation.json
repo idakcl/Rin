@@ -189,7 +189,8 @@
       "rejected": "拒绝",
       "waiting": "待审核"
     },
-    "title": "朋友们"
+    "title": "朋友们",
+    "avatarHint": "留空则自动获取对方站点图标"
   },
   "github_login": "Github 登录",
   "hashtags": "标签",

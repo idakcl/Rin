@@ -219,7 +219,7 @@ export interface FriendListResponse {
 export interface CreateFriendRequest {
   name: string;
   desc: string;
-  avatar: string;
+  avatar?: string;
   url: string;
 }
 

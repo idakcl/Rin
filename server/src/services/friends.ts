@@ -7,6 +7,73 @@ import { friends } from "../db/schema";
 import { notify } from "../utils/webhook";
 import { resolveWebhookConfig } from "./config-helpers";
 
+// 抓取目标站点图标时使用的浏览器 UA，提高图标获取成功率
+const FAVICON_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+/**
+ * 从目标站点 HTML 中提取图标地址（优先 apple-touch-icon，其次 icon/shortcut icon）。
+ * 抓取失败或提取不到时，回退到 `${origin}/favicon.ico`。
+ * 整个过程包裹在 try/catch 内，绝不阻塞友链创建。
+ */
+async function deriveFavicon(targetUrl: string, ua: string): Promise<string> {
+    try {
+        const base = new URL(targetUrl);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch(targetUrl, {
+            method: 'GET',
+            headers: { 'User-Agent': ua, 'Accept': 'text/html' },
+            redirect: 'follow',
+            signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (!res.ok || !res.body) {
+            return `${base.origin}/favicon.ico`;
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let html = '';
+        const LIMIT = 200000;
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            html += decoder.decode(value, { stream: true });
+            // 图标链接一般在 <head> 内，拿到 </head> 或读取足够长度即可停止
+            if (html.length >= LIMIT || html.includes('</head>')) {
+                await reader.cancel();
+                break;
+            }
+        }
+        const iconHref = extractIconHref(html);
+        if (iconHref) {
+            return new URL(iconHref, targetUrl).href;
+        }
+    } catch (e: any) {
+        console.error('deriveFavicon failed:', e?.message || e);
+    }
+    try {
+        return new URL(targetUrl).origin + '/favicon.ico';
+    } catch {
+        return '';
+    }
+}
+
+function extractIconHref(html: string): string | null {
+    const patterns = [
+        // apple-touch-icon（高优先级，通常是高质量方形图标）
+        /<link[^>]+rel=["'][^"']*\bapple-touch-icon[^"']*["'][^>]*href=["']([^"']+)["']/i,
+        // <link rel="icon" href="..."> 或 rel="shortcut icon"
+        /<link[^>]+rel=["'][^"']*\bicon[^"']*["'][^>]*href=["']([^"']+)["']/i,
+        // href 在前、rel 在后
+        /<link[^>]+href=["']([^"']+)["'][^>]*rel=["'][^"']*\bicon[^"']*["']/i,
+    ];
+    for (const p of patterns) {
+        const m = html.match(p);
+        if (m && m[1]) return m[1].trim();
+    }
+    return null;
+}
+
 export function FriendService(): Hono {
     const app = new Hono();
 
@@ -46,17 +113,18 @@ export function FriendService(): Hono {
         const serverConfig = c.get('serverConfig');
         const body = await profileAsync(c, 'friend_create_parse', () => c.req.json());
         const { name, desc, avatar, url } = body;
+        const avatarStr = (typeof avatar === 'string') ? avatar.trim() : '';
         
         const enable = await profileAsync(c, 'friend_create_config', () => clientConfig.getOrDefault('friend_apply_enable', true));
         if (!enable && !admin) {
             return c.text('Friend Link Apply Disabled', 403);
         }
         
-        if (name.length > 20 || desc.length > 100 || avatar.length > 100 || url.length > 100) {
+        if (name.length > 20 || desc.length > 100 || avatarStr.length > 100 || url.length > 100) {
             return c.text('Invalid input', 400);
         }
         
-        if (name.length === 0 || desc.length === 0 || avatar.length === 0 || url.length === 0) {
+        if (name.length === 0 || desc.length === 0 || url.length === 0) {
             return c.text('Invalid input', 400);
         }
         
@@ -71,9 +139,14 @@ export function FriendService(): Hono {
             }
         }
         
+        // 未填写头像时，自动获取目标站点的图标（抓取失败则回退到 /favicon.ico）
+        const finalAvatar = avatarStr.length > 0
+            ? avatarStr
+            : await deriveFavicon(url, FAVICON_UA);
+        
         const accepted = admin ? 1 : 0;
         await profileAsync(c, 'friend_create_insert', () => db.insert(friends).values({
-            name, desc, avatar, url, uid: uid, accepted
+            name, desc, avatar: finalAvatar, url, uid: uid, accepted
         }));
 
         if (!admin) {

@@ -189,7 +189,8 @@
       "rejected": "Rejected",
       "waiting": "Pending review"
     },
-    "title": "Friends"
+    "title": "Friends",
+    "avatarHint": "Leave empty to auto-fetch the site icon"
   },
   "github_login": "Github Login",
   "hashtags": "Hashtags",

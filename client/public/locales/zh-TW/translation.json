@@ -189,7 +189,8 @@
       "rejected": "拒絕",
       "waiting": "待審核"
     },
-    "title": "朋友們"
+    "title": "朋友們",
+    "avatarHint": "留空則自動獲取對方站點圖示"
   },
   "github_login": "Github 登入",
   "hashtags": "標籤",
