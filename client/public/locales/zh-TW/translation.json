@@ -190,7 +190,8 @@
       "waiting": "待審核"
     },
     "title": "朋友們",
-    "avatarHint": "留空則自動獲取對方站點圖示"
+    "avatarHint": "留空則自動獲取對方站點圖示",
+    "descHint": "選填，可留空"
   },
   "github_login": "Github 登入",
   "hashtags": "標籤",

@@ -218,7 +218,7 @@ export interface FriendListResponse {
 
 export interface CreateFriendRequest {
   name: string;
-  desc: string;
+  desc?: string;
   avatar?: string;
   url: string;
 }

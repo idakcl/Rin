@@ -113,6 +113,7 @@ export function FriendService(): Hono {
         const serverConfig = c.get('serverConfig');
         const body = await profileAsync(c, 'friend_create_parse', () => c.req.json());
         const { name, desc, avatar, url } = body;
+        const descStr = (typeof desc === 'string') ? desc.trim() : '';
         const avatarStr = (typeof avatar === 'string') ? avatar.trim() : '';
         
         const enable = await profileAsync(c, 'friend_create_config', () => clientConfig.getOrDefault('friend_apply_enable', true));
@@ -120,11 +121,12 @@ export function FriendService(): Hono {
             return c.text('Friend Link Apply Disabled', 403);
         }
         
-        if (name.length > 20 || desc.length > 100 || avatarStr.length > 100 || url.length > 100) {
+        if (name.length > 20 || descStr.length > 100 || avatarStr.length > 100 || url.length > 100) {
             return c.text('Invalid input', 400);
         }
         
-        if (name.length === 0 || desc.length === 0 || url.length === 0) {
+        // 名称、网址为必填；描述、头像为选填
+        if (name.length === 0 || url.length === 0) {
             return c.text('Invalid input', 400);
         }
         
@@ -146,7 +148,7 @@ export function FriendService(): Hono {
         
         const accepted = admin ? 1 : 0;
         await profileAsync(c, 'friend_create_insert', () => db.insert(friends).values({
-            name, desc, avatar: finalAvatar, url, uid: uid, accepted
+            name, desc: descStr, avatar: finalAvatar, url, uid: uid, accepted
         }));
 
         if (!admin) {

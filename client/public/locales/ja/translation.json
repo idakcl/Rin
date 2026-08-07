@@ -190,7 +190,8 @@
       "waiting": "審査待ち"
     },
     "title": "友人",
-    "avatarHint": "空欄の場合は相手サイトのアイコンを自動取得"
+    "avatarHint": "空欄の場合は相手サイトのアイコンを自動取得",
+    "descHint": "任意（空欄可）"
   },
   "github_login": "Github ログイン",
   "hashtags": "ラベル",

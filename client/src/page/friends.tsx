@@ -109,6 +109,7 @@ export function FriendsPage() {
                             <div className="text-sm mt-4 text-neutral-500 font-normal">
                                 <Input value={name} setValue={setName} placeholder={t('sitename')} variant="flat" />
                                 <Input value={desc} setValue={setDesc} placeholder={t('description')} variant="flat" className="mt-2" />
+                                <p className="text-xs text-neutral-400 mt-1">{t('friends.descHint')}</p>
                                 <Input value={avatar} setValue={setAvatar} placeholder={t('avatar.url')} variant="flat" className="mt-2" />
                                 <p className="text-xs text-neutral-400 mt-1">{t('friends.avatarHint')}</p>
                                 <Input value={url} setValue={setUrl} placeholder={t('url')} variant="flat" className="my-2" />

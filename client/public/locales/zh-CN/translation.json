@@ -190,7 +190,8 @@
       "waiting": "待审核"
     },
     "title": "朋友们",
-    "avatarHint": "留空则自动获取对方站点图标"
+    "avatarHint": "留空则自动获取对方站点图标",
+    "descHint": "选填，可留空"
   },
   "github_login": "Github 登录",
   "hashtags": "标签",

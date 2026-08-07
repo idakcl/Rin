@@ -73,7 +73,7 @@ export const commentCreateSchema = t.Object({
 
 export const friendCreateSchema = t.Object({
   name: t.String(),
-  desc: t.String(),
+  desc: t.String({ optional: true }),
   avatar: t.String({ optional: true }),
   url: t.String(),
 });

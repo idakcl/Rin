@@ -190,7 +190,8 @@
       "waiting": "Pending review"
     },
     "title": "Friends",
-    "avatarHint": "Leave empty to auto-fetch the site icon"
+    "avatarHint": "Leave empty to auto-fetch the site icon",
+    "descHint": "Optional"
   },
   "github_login": "Github Login",
   "hashtags": "Hashtags",
