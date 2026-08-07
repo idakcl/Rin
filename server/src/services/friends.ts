@@ -10,11 +10,13 @@ import { resolveWebhookConfig } from "./config-helpers";
 // 抓取目标站点图标时使用的浏览器 UA，提高图标获取成功率
 const FAVICON_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-// 根据目标站点地址直接拼出可直连的兜底 favicon（浏览器端加载，国内可访问）
-function selfFavicon(targetUrl: string): string {
+// 根据目标站点域名拼出可直连的兜底 favicon 服务地址（返回目标站真实图标）。
+// 选用 DuckDuckGo 的 favicon 接口：实测对各站点返回真实图标（非通用默认图），
+// 且为公开 CDN，国内外均可直连。
+function faviconFallback(targetUrl: string): string {
     try {
         const u = new URL(targetUrl);
-        return `${u.protocol}//${u.host}/favicon.ico`;
+        return `https://icons.duckduckgo.com/ip3/${u.host}.ico`;
     } catch {
         return '';
     }
@@ -22,11 +24,11 @@ function selfFavicon(targetUrl: string): string {
 
 /**
  * 从目标站点 HTML 中提取图标地址（优先 apple-touch-icon，其次 icon/shortcut icon）。
- * 抓取失败、超时或提取不到时，回退到目标站点自身的绝对 favicon 地址。
+ * 抓取失败、超时或提取不到时，回退到公共 favicon 服务的真实图标地址。
  * 整个流程包裹在 try/catch 内，绝不阻塞友链创建。
  */
 async function deriveFavicon(targetUrl: string, ua: string): Promise<string> {
-    const fallback = selfFavicon(targetUrl);
+    const fallback = faviconFallback(targetUrl);
     try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 6000);

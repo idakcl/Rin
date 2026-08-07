@@ -214,11 +214,14 @@ function Friend({ friend }: { friend: FriendItem }) {
                             } catch { /* ignore */ }
                             const img = e.currentTarget;
                             const self = host ? `${proto}//${host}/favicon.ico` : '';
-                            const bing = host ? `https://www.bing.com/favicon.ico?url=${host}` : '';
+                            const ddg = host ? `https://icons.duckduckgo.com/ip3/${host}.ico` : '';
+                            const iowen = host ? `https://api.iowen.cn/favicon/${host}.ico` : '';
                             if (self && img.src !== self) {
                                 img.src = self;
-                            } else if (bing && img.src !== bing) {
-                                img.src = bing;
+                            } else if (ddg && img.src !== ddg) {
+                                img.src = ddg;
+                            } else if (iowen && img.src !== iowen) {
+                                img.src = iowen;
                             } else {
                                 img.style.visibility = 'hidden';
                             }
