@@ -40,7 +40,7 @@ export function TagService(): Hono {
                         feed: {
                             columns: {
                                 id: true, title: true, summary: true, content: true, 
-                                createdAt: true, updatedAt: true, draft: false, listed: false
+                                createdAt: true, updatedAt: true, draft: false, listed: false, alias: true
                             },
                             with: {
                                 user: { columns: { id: true, username: true, avatar: true } },
