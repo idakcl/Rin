@@ -2,6 +2,7 @@ import "katex/dist/katex.min.css";
 import React, { cloneElement, isValidElement, useEffect, useMemo, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { AudioPlayer } from "./audio-player";
 import {
   base16AteliersulphurpoolLight,
   vscDarkPlus,
@@ -427,6 +428,24 @@ export function Markdown({ content }: { content: string }) {
         },
         div({ children, node, ...props }) {
           return <div {...props}>{children}</div>;
+        },
+        audio({ node }) {
+          // Read all attributes from the hast node directly: this avoids
+          // relying on react-markdown's per-tag prop typings (which omit
+          // autoplay/loop on <audio>) and handles data-* uniformly.
+          const props = (node?.properties ?? {}) as Record<string, unknown>;
+          const src = typeof props.src === "string" ? props.src : undefined;
+          const autoplay = props.autoplay !== undefined && props.autoplay !== false;
+          const loop = props.loop !== undefined && props.loop !== false;
+          const dataName = (props.dataName ?? props["data-name"]) as string | undefined;
+          return (
+            <AudioPlayer
+              src={src}
+              autoplay={autoplay}
+              loop={loop}
+              name={dataName}
+            />
+          );
         },
       }}
     />), [content])

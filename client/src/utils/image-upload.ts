@@ -106,13 +106,17 @@ export function buildMarkdownVideo(_fileName: string, url: string) {
 // Raw <audio> block for the markdown editor. `autoplay` controls whether the
 // audio starts playing when the article is opened. Wrapped in blank lines so
 // the rehype-raw renderer treats it as a block-level element.
-export function buildMarkdownAudio(_fileName: string, url: string, autoplay = false) {
+export function buildMarkdownAudio(fileName: string, url: string, autoplay = false) {
   const safeUrl = url.replace(/\s/g, "%20");
   const autoplayAttr = autoplay ? " autoplay" : "";
-  // Explicit height + display:block so the native controls (which need ~40px
-  // in dark-mode themes) don't get clipped, and the element doesn't collapse
-  // to inline. Wrapped in a div for reliable block-level spacing.
-  return `\n<div class="rin-audio-block" style="margin:0.75em 0"><audio src="${safeUrl}" controls${autoplayAttr} style="width:100%;height:40px;display:block"></audio></div>\n`;
+  // data-name carries the original filename so the custom audio player can
+  // display it above the progress bar. Escaped for safe use in an attribute.
+  const safeName = fileName
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return `\n<audio data-name="${safeName}" src="${safeUrl}" controls${autoplayAttr} preload="metadata"></audio>\n`;
 }
 
 // Markdown download link for a generic file uploaded via netpan.
