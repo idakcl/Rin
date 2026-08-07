@@ -103,9 +103,17 @@ export function buildMarkdownImage(fileName: string, url: string, metadata: Imag
 
 // Raw <video> block for the markdown editor. Wrapped in blank lines so the
 // rehype-raw renderer treats it as a block-level element.
+//
+// A media fragment (`#t=0.1`) is appended so browsers seek to ~0.1s and paint
+// that frame as a static preview BEFORE the user presses play — no separate
+// poster image (and no backend thumbnail job) required. `preload="metadata"`
+// keeps bandwidth low while still letting the preview frame decode.
 export function buildMarkdownVideo(_fileName: string, url: string) {
-  const safeUrl = url.replace(/\s/g, "%20");
-  return `\n<video src="${safeUrl}" controls style="max-width:100%"></video>\n`;
+  let safeUrl = url.replace(/\s/g, "%20");
+  if (!safeUrl.includes("#")) {
+    safeUrl += "#t=0.1";
+  }
+  return `\n<video src="${safeUrl}" controls preload="metadata" style="max-width:100%"></video>\n`;
 }
 
 // Raw <audio> block for the markdown editor. `autoplay` controls whether the
