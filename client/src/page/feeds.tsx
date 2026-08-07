@@ -38,6 +38,18 @@ export function FeedsPage() {
     useEffect(() => {
         let cancelled = false
         const page = tryInt(1, query.get("page"))
+        // 短首屏级联修复：哨兵挂载即处于「视口+800px 预触发区」时，IntersectionObserver
+        // 只触发一次且会被 loadInitial 的 flush 覆盖，导致预取的后续页永不追加。
+        // 这里主动级联 loadNext，直到页面变高可滚动或 hasNext=false。
+        const fillShortPage = () => {
+            if (cancelled) return
+            const el = sentinelRef.current
+            if (!el) return
+            const rect = el.getBoundingClientRect()
+            if (rect.top <= window.innerHeight + 800) {
+                loadNext().then((ok) => { if (ok) requestAnimationFrame(fillShortPage) })
+            }
+        }
         loadInitial().then(() => {
             if (cancelled) return
             // 深链 ?page=N：串行预热到该页（上限 MAX_DEEPLINK_PAGES），再粗略定位到底部
@@ -51,6 +63,7 @@ export function FeedsPage() {
                 requestAnimationFrame(() => {
                     window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" })
                 })
+                fillShortPage()
             })
         })
         return () => { cancelled = true }
