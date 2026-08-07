@@ -104,16 +104,22 @@ export function buildMarkdownImage(fileName: string, url: string, metadata: Imag
 // Raw <video> block for the markdown editor. Wrapped in blank lines so the
 // rehype-raw renderer treats it as a block-level element.
 //
-// A media fragment (`#t=0.1`) is appended so browsers seek to ~0.1s and paint
-// that frame as a static preview BEFORE the user presses play — no separate
-// poster image (and no backend thumbnail job) required. `preload="metadata"`
-// keeps bandwidth low while still letting the preview frame decode.
-export function buildMarkdownVideo(_fileName: string, url: string) {
+// Two preview fallbacks work together:
+//   1. A `poster` URL (preferred) — a real thumbnail image. iOS Safari
+//      ignores the `#t=` trick but honours the `poster` attribute, so this
+//      is what makes the first frame show on iPhone/iPad.
+//   2. The media fragment `#t=0.1` — desktop browsers (Chrome/Firefox/Safari)
+//      seek to ~0.1s and paint that frame as a static preview even without a
+//      poster. Harmless when a poster is already supplied.
+export function buildMarkdownVideo(_fileName: string, url: string, posterUrl?: string) {
   let safeUrl = url.replace(/\s/g, "%20");
   if (!safeUrl.includes("#")) {
     safeUrl += "#t=0.1";
   }
-  return `\n<video src="${safeUrl}" controls preload="metadata" style="max-width:100%"></video>\n`;
+  const posterAttr = posterUrl
+    ? ` poster="${posterUrl.replace(/\s/g, "%20")}"`
+    : "";
+  return `\n<video src="${safeUrl}"${posterAttr} controls preload="metadata" style="max-width:100%"></video>\n`;
 }
 
 // Raw <audio> block for the markdown editor. `autoplay` controls whether the
@@ -380,4 +386,144 @@ export async function uploadVideoToNetpan(file: File): Promise<string> {
 // Generic file upload (audio, documents, archives, etc.) backed by netpan.
 export async function uploadFileToNetpan(file: File): Promise<string> {
   return uploadToNetpan(file);
+}
+
+// ---------------------------------------------------------------------------
+// Video poster (thumbnail) helpers
+// ---------------------------------------------------------------------------
+
+// Options for `generateVideoPosterBlob`.
+export interface VideoPosterOptions {
+  // Seconds into the video to grab the frame from. 0.5s tends to skip any
+  // pure-black intro frames while staying close to the literal first frame.
+  seekTo?: number;
+  // Longest edge of the generated JPEG, in pixels. The poster is tiny so we
+  // keep it small to save bandwidth.
+  maxWidth?: number;
+  // JPEG quality 0..1.
+  quality?: number;
+  // Hard timeout (ms). If the video host is slow or CORS-tants, we bail.
+  timeoutMs?: number;
+}
+
+// Pull a single frame out of a cross-origin video and return it as a JPEG
+// Blob. Returns `null` on any failure (CORS taint, decode error, timeout,
+// unsupported codec) — callers should treat that as "no poster" rather than
+// an error.
+//
+// REQUIRES the video URL to serve `Access-Control-Allow-Origin` matching the
+// page origin (or `*`). Both R2 (rinx.hello.nyc.mn) and netpan (*.1234.nyc.mn)
+// satisfy this for the current deployments.
+export async function generateVideoPosterBlob(
+  videoUrl: string,
+  options: VideoPosterOptions = {},
+): Promise<Blob | null> {
+  if (typeof document === "undefined") return null;
+  const { seekTo = 0.5, maxWidth = 480, quality = 0.8, timeoutMs = 8000 } = options;
+
+  return await new Promise<Blob | null>((resolve) => {
+    let settled = false;
+    const finish = (blob: Blob | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        video.removeAttribute("src");
+        video.load();
+      } catch {
+        // ignore
+      }
+      if (video.parentNode) video.parentNode.removeChild(video);
+      resolve(blob);
+    };
+
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+    // Off-screen but still attached — some browsers (incl. mobile Safari)
+    // refuse to load metadata for a detached video element.
+    video.style.position = "fixed";
+    video.style.left = "-9999px";
+    video.style.top = "-9999px";
+    video.style.width = "1px";
+    video.style.height = "1px";
+
+    const timer = setTimeout(() => finish(null), timeoutMs);
+
+    video.onerror = () => finish(null);
+    video.onloadedmetadata = () => {
+      const duration = isFinite(video.duration) ? video.duration : 0;
+      const t = duration > 0 ? Math.min(seekTo, Math.max(0, duration - 0.05)) : seekTo;
+      try {
+        video.currentTime = t > 0 ? t : 0.001;
+      } catch {
+        finish(null);
+      }
+    };
+    video.onseeked = () => {
+      try {
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        if (!vw || !vh) {
+          finish(null);
+          return;
+        }
+        const scale = Math.min(1, maxWidth / vw);
+        const w = Math.max(1, Math.round(vw * scale));
+        const h = Math.max(1, Math.round(vh * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          finish(null);
+          return;
+        }
+        ctx.drawImage(video, 0, 0, w, h);
+        canvas.toBlob(
+          (blob) => finish(blob || null),
+          "image/jpeg",
+          quality,
+        );
+      } catch {
+        // CORS-tainted canvas or other SecurityError → no poster.
+        finish(null);
+      }
+    };
+
+    video.src = videoUrl;
+    document.body.appendChild(video);
+  });
+}
+
+// Upload an arbitrary Blob (used for generated video posters) to the
+// Cloudflare R2 storage endpoint and return the public URL. Returns `null`
+// on failure so callers can fall back to "no poster".
+export async function uploadBlobToR2(blob: Blob, filename: string): Promise<string | null> {
+  try {
+    // client.storage.upload expects a File (which extends Blob) — wrap the
+    // canvas blob so the upload FormData picks up the filename + MIME type.
+    const file = new File([blob], filename, { type: blob.type || "image/jpeg" });
+    const response = await client.storage.upload(file, filename);
+    const data = response?.data;
+    if (typeof data === "string") return data;
+    if (data && typeof (data as { url?: unknown }).url === "string") {
+      return (data as { url: string }).url;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Convenience: generate a poster from `videoUrl` and upload it to R2.
+// Returns the poster URL, or `null` if any step failed.
+export async function attachVideoPoster(videoUrl: string): Promise<string | null> {
+  const blob = await generateVideoPosterBlob(videoUrl);
+  if (!blob) return null;
+  const ext = blob.type.includes("png") ? "png" : "jpg";
+  const name = `video-poster-${Date.now()}.${ext}`;
+  return uploadBlobToR2(blob, name);
 }

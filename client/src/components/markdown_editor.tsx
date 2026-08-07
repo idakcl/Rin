@@ -6,7 +6,7 @@ import Loading from 'react-loading';
 import { FlatInset, FlatTabButton } from "@rin/ui";
 import { useAlert } from "./dialog";
 import { useColorMode } from "../utils/darkModeUtils";
-import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE, DEFAULT_VIDEO_MAX_FILE_SIZE, isVideoFile, buildMarkdownVideo, uploadVideoToNetpan, isAudioFile, uploadFileToNetpan, buildMarkdownAudio, buildMarkdownFile } from "../utils/image-upload";
+import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE, DEFAULT_VIDEO_MAX_FILE_SIZE, isVideoFile, buildMarkdownVideo, uploadVideoToNetpan, isAudioFile, uploadFileToNetpan, buildMarkdownAudio, buildMarkdownFile, attachVideoPoster } from "../utils/image-upload";
 import { NETPAN_MAX_FILE_SIZE } from "../netpan";
 import { Markdown } from "./markdown";
 
@@ -400,7 +400,12 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
               height: result.height,
             });
           }
-          return buildMarkdownVideo(file.name, result.url);
+          // For videos, try to generate a poster frame so mobile Safari
+          // shows a thumbnail before play (it ignores the #t= media
+          // fragment). Poster upload is best-effort; failures silently fall
+          // back to no poster.
+          const posterUrl = await attachVideoPoster(result.url);
+          return buildMarkdownVideo(file.name, result.url, posterUrl ?? undefined);
         },
         showAlert,
       );
@@ -448,7 +453,11 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           if (isImageFile(file)) {
             return buildMarkdownImage(file.name, url);
           }
-          return buildMarkdownVideo(file.name, url);
+          // Videos: generate a poster frame so the unplayed preview shows
+          // on mobile Safari (which ignores the #t= media fragment trick).
+          // attachVideoPoster uploads the poster to R2; failures are silent.
+          const posterUrl = await attachVideoPoster(url);
+          return buildMarkdownVideo(file.name, url, posterUrl ?? undefined);
         },
         showAlert,
       );
