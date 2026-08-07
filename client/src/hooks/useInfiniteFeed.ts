@@ -49,11 +49,11 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
   // 首屏加载完成前，禁止 loadNext 触发：否则挂载期哨兵 fill 会以 nextPage=1
   // 抢跑抓取第 1 页并 append 到 loadInitial 的 SET 结果之上，导致整页文章重复。
   const bootstrappedRef = useRef(false)
-
-  // [DEBUG] 追踪 loadInitial/loadNext 事件序列，定位重复渲染根因（定位后删除）
-  ;(window as any).__diag = (window as any).__diag || []
-  const D = (o: Record<string, unknown>) => { (window as any).__diag.push(o) }
-  D({ ev: "mount", limit, type })
+  // 已加载页集合：fill 递归与 IntersectionObserver 回调各自独立触发 loadNext，
+  // 短首屏级联时两者都会对同一个 target 调 loadNext；首个 resolve 后 loadingRef 复位，
+  // 第二个已在途的调用会以 lr:false 进入并再次 append 同一页，导致文章重复。
+  // 这里在开始加载前把 target 记入集合，重复 target 直接跳过；失败/无数据时移除以便重试。
+  const loadedPagesRef = useRef<Set<number>>(new Set())
 
   useEffect(() => {
     mounted.current = true
@@ -90,11 +90,12 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
 
   /** 追加下一页：命中 prefetchCache 则瞬时挂载，否则走网络。返回是否成功追加 */
   const loadNext = useCallback((): Promise<boolean> => {
-    D({ ev: "LN_entry", boot: bootstrappedRef.current, lr: loadingRef.current, tgt: bucketRef.current.nextPage, hn: bucketRef.current.hasNext })
-    if (!bootstrappedRef.current) { D({ ev: "LN_ret", why: "boot" }); return Promise.resolve(false) }
-    if (loadingRef.current) { D({ ev: "LN_ret", why: "lr" }); return Promise.resolve(false) }
+    if (!bootstrappedRef.current) return Promise.resolve(false)
+    if (loadingRef.current) return Promise.resolve(false)
     const target = bucketRef.current.nextPage
-    if (!bucketRef.current.hasNext) { D({ ev: "LN_ret", why: "hn" }); return Promise.resolve(false) }
+    if (!bucketRef.current.hasNext) return Promise.resolve(false)
+    if (loadedPagesRef.current.has(target)) return Promise.resolve(false)
+    loadedPagesRef.current.add(target)
 
     loadingRef.current = true
     flush((prev) => ({ ...prev, loading: true }))
@@ -108,22 +109,20 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
       .then(({ data }) => {
         if (!data) {
           loadingRef.current = false
+          loadedPagesRef.current.delete(target)
           flush((prev) => ({ ...prev, loading: false }))
           return false
         }
         const items = (data.data ?? []) as any[]
         const nextPage = target + 1
         prefetchCache.current.delete(target)
-        flush((prev) => {
-          D({ ev: "LN_flush", target, before: prev.items.length, after: prev.items.length + items.length })
-          return {
-            items: [...prev.items, ...items],
-            nextPage,
-            hasNext: data.hasNext,
-            loading: false,
-            total: data.size ?? prev.total,
-          }
-        })
+        flush((prev) => ({
+          items: [...prev.items, ...items],
+          nextPage,
+          hasNext: data.hasNext,
+          loading: false,
+          total: data.size ?? prev.total,
+        }))
         loadingRef.current = false
         // 挂载后，保证下面 2~3 页数据就绪（抖音式「下面几屏」）
         prefetch(nextPage)
@@ -132,6 +131,7 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
       })
       .catch(() => {
         loadingRef.current = false
+        loadedPagesRef.current.delete(target)
         flush((prev) => ({ ...prev, loading: false }))
         return false
       })
@@ -143,7 +143,7 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
     fetching.current.clear()
     loadingRef.current = false
     bootstrappedRef.current = false
-    D({ ev: "LI_start", limit })
+    loadedPagesRef.current.clear()
     flush(() => ({ items: [], nextPage: 1, hasNext: true, loading: true, total: 0 }))
     return client.feed
       .list({ page: 1, limit, type })
@@ -152,7 +152,7 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
           flush(() => ({ items: [], nextPage: 1, hasNext: false, loading: false, total: 0 }))
           return
         }
-        D({ ev: "LI_done", n: (data.data ?? []).length, nextPage: 2, hasNext: data.hasNext })
+        loadedPagesRef.current.add(1)
         flush(() => ({
           items: (data.data ?? []) as any[],
           nextPage: 2,
