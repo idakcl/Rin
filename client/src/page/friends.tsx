@@ -209,7 +209,7 @@ function Friend({ friend }: { friend: FriendItem }) {
     return (
         <>
             <a title={friend.name} href={toAbsoluteUrl(friend.url)} target="_blank" className="bg-button w-full bg-w rounded-xl p-4 flex flex-col justify-center items-center relative">
-                <div className="w-16 h-16">
+                <div className="w-8 h-8">
                     <img className={"w-full h-full object-cover rounded-full " + (friend.health.length > 0 ? "grayscale" : "")} src={friend.avatar} alt={friend.name}
                         onError={(e) => {
                             let host = '';
@@ -274,7 +274,7 @@ function Friend({ friend }: { friend: FriendItem }) {
                 contentLabel={t('update$sth', { sth: friend.name })}
             >
                 <FlatPanel className="relative flex w-[80vw] flex-col items-center justify-start p-6 sm:w-[60vw] md:w-[50vw] lg:w-[40vw] xl:w-[30vw]">
-                    <div className="w-16 h-16">
+                    <div className="w-8 h-8">
                         <img className={"w-full h-full object-cover rounded-xl " + (friend.health.length > 0 ? "grayscale" : "")} src={friend.avatar} alt={friend.name} />
                     </div>
                     {profile?.permission &&
