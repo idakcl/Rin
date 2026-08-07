@@ -203,7 +203,27 @@ function Friend({ friend }: { friend: FriendItem }) {
         <>
             <a title={friend.name} href={friend.url} target="_blank" className="bg-button w-full bg-w rounded-xl p-4 flex flex-col justify-center items-center relative">
                 <div className="w-16 h-16">
-                    <img className={"rounded-full " + (friend.health.length > 0 ? "grayscale" : "")} src={friend.avatar} alt={friend.name} />
+                    <img className={"rounded-full " + (friend.health.length > 0 ? "grayscale" : "")} src={friend.avatar} alt={friend.name}
+                        onError={(e) => {
+                            let host = '';
+                            let proto = 'https:';
+                            try {
+                                const u = new URL(friend.url);
+                                host = u.host;
+                                proto = u.protocol;
+                            } catch { /* ignore */ }
+                            const img = e.currentTarget;
+                            const self = host ? `${proto}//${host}/favicon.ico` : '';
+                            const bing = host ? `https://www.bing.com/favicon.ico?url=${host}` : '';
+                            if (self && img.src !== self) {
+                                img.src = self;
+                            } else if (bing && img.src !== bing) {
+                                img.src = bing;
+                            } else {
+                                img.style.visibility = 'hidden';
+                            }
+                        }}
+                    />
                 </div>
                 <p className="text-base text-center">{friend.name}</p>
                 {friend.health.length == 0 && <p className="text-sm text-neutral-500 text-center">{friend.desc}</p>}

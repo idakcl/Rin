@@ -10,16 +10,26 @@ import { resolveWebhookConfig } from "./config-helpers";
 // 抓取目标站点图标时使用的浏览器 UA，提高图标获取成功率
 const FAVICON_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
+// 根据目标站点地址直接拼出可直连的兜底 favicon（浏览器端加载，国内可访问）
+function selfFavicon(targetUrl: string): string {
+    try {
+        const u = new URL(targetUrl);
+        return `${u.protocol}//${u.host}/favicon.ico`;
+    } catch {
+        return '';
+    }
+}
+
 /**
  * 从目标站点 HTML 中提取图标地址（优先 apple-touch-icon，其次 icon/shortcut icon）。
- * 抓取失败或提取不到时，回退到 `${origin}/favicon.ico`。
- * 整个过程包裹在 try/catch 内，绝不阻塞友链创建。
+ * 抓取失败、超时或提取不到时，回退到目标站点自身的绝对 favicon 地址。
+ * 整个流程包裹在 try/catch 内，绝不阻塞友链创建。
  */
 async function deriveFavicon(targetUrl: string, ua: string): Promise<string> {
+    const fallback = selfFavicon(targetUrl);
     try {
-        const base = new URL(targetUrl);
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 5000);
+        const timer = setTimeout(() => controller.abort(), 6000);
         const res = await fetch(targetUrl, {
             method: 'GET',
             headers: { 'User-Agent': ua, 'Accept': 'text/html' },
@@ -28,7 +38,7 @@ async function deriveFavicon(targetUrl: string, ua: string): Promise<string> {
         });
         clearTimeout(timer);
         if (!res.ok || !res.body) {
-            return `${base.origin}/favicon.ico`;
+            return fallback;
         }
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -44,21 +54,17 @@ async function deriveFavicon(targetUrl: string, ua: string): Promise<string> {
                 break;
             }
         }
-        const iconHref = extractIconHref(html);
+        const iconHref = extractIconHref(html, targetUrl);
         if (iconHref) {
-            return new URL(iconHref, targetUrl).href;
+            return iconHref;
         }
     } catch (e: any) {
         console.error('deriveFavicon failed:', e?.message || e);
     }
-    try {
-        return new URL(targetUrl).origin + '/favicon.ico';
-    } catch {
-        return '';
-    }
+    return fallback;
 }
 
-function extractIconHref(html: string): string | null {
+function extractIconHref(html: string, base: string): string | null {
     const patterns = [
         // apple-touch-icon（高优先级，通常是高质量方形图标）
         /<link[^>]+rel=["'][^"']*\bapple-touch-icon[^"']*["'][^>]*href=["']([^"']+)["']/i,
@@ -69,7 +75,16 @@ function extractIconHref(html: string): string | null {
     ];
     for (const p of patterns) {
         const m = html.match(p);
-        if (m && m[1]) return m[1].trim();
+        if (!m || !m[1]) continue;
+        const href = m[1].trim();
+        // 跳过 data: 内联垃圾值（如 "data:,"）
+        if (/^data:/i.test(href)) continue;
+        try {
+            // 解析为绝对地址，兼容相对路径与协议相对路径（//host/x.ico）
+            return new URL(href, base).href;
+        } catch {
+            continue;
+        }
     }
     return null;
 }

@@ -38,3 +38,6 @@ dist-ssr
 
 # Bun
 .bun/*
+# build artifacts
+build-*.tar.gz
+*.tar.gz
