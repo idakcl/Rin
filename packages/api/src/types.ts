@@ -92,6 +92,7 @@ export interface UpdateFeedRequest {
 
 export interface AdjacentFeed {
   id: number;
+  alias?: string | null;
   title: string | null;
   summary: string;
   hashtags: Array<{ id: number; name: string }>;

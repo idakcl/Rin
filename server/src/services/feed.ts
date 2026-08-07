@@ -329,9 +329,10 @@ export function FeedService(): Hono<{
                 const summary = feed.summary.length > 0
                     ? feed.summary
                     : plainText.length > 50 ? plainText.slice(0, 50) : plainText;
-                const cacheKey = `${feed.id}_${feedDirection}_${id_num}`;
+                const cacheKey = `${feed.id}_${feedDirection}_v2_${id_num}`;
                 const cacheData = {
                     id: feed.id,
+                    alias: feed.alias,
                     title: feed.title,
                     summary: summary,
                     hashtags: hashtags_flatten,
@@ -345,7 +346,7 @@ export function FeedService(): Hono<{
         }
 
         const getPreviousFeed = async () => {
-            const previousFeedCached = await profileAsync(c, 'feed_adjacent_prev_cache', () => cache.getBySuffix(`previous_feed_${id_num}`));
+            const previousFeedCached = await profileAsync(c, 'feed_adjacent_prev_cache', () => cache.getBySuffix(`previous_feed_v2_${id_num}`));
             if (previousFeedCached && previousFeedCached.length > 0) {
                 return previousFeedCached[0];
             } else {
@@ -365,7 +366,7 @@ export function FeedService(): Hono<{
         };
 
         const getNextFeed = async () => {
-            const nextFeedCached = await profileAsync(c, 'feed_adjacent_next_cache', () => cache.getBySuffix(`next_feed_${id_num}`));
+            const nextFeedCached = await profileAsync(c, 'feed_adjacent_next_cache', () => cache.getBySuffix(`next_feed_v2_${id_num}`));
             if (nextFeedCached && nextFeedCached.length > 0) {
                 return nextFeedCached[0];
             } else {
