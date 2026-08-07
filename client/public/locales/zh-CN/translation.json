@@ -151,6 +151,10 @@
       "label": "自动播放",
       "hint": "勾选后，读者打开文章时音乐自动播放（多数浏览器会拦截带声音的自动播放，需用户交互后才出声）"
     },
+    "upload_target": {
+      "cloudflare": "Cloudflare",
+      "netpan": "netpan"
+    },
     "toolbar": {
       "bold": "加粗",
       "code_block": "代码块",

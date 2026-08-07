@@ -151,6 +151,10 @@
       "label": "Autoplay",
       "hint": "When checked, music starts playing automatically when readers open the article (most browsers block autoplay with sound until user interaction)"
     },
+    "upload_target": {
+      "cloudflare": "Cloudflare",
+      "netpan": "netpan"
+    },
     "toolbar": {
       "bold": "Bold",
       "code_block": "Code block",

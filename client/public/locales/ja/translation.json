@@ -151,6 +151,10 @@
       "label": "自動再生",
       "hint": "チェックすると、読者が記事を開いたときに音楽が自動再生されます（多くのブラウザはユーザーの操作があるまで音声付きの自動再生をブロックします）"
     },
+    "upload_target": {
+      "cloudflare": "Cloudflare",
+      "netpan": "netpan"
+    },
     "toolbar": {
       "bold": "太字",
       "code_block": "コードブロック",

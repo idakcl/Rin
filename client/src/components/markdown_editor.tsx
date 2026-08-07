@@ -423,12 +423,17 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
       void insertMediaSequentially(
         files,
         (file) => {
-          if (!isVideoFile(file)) return t("upload.video.invalid_type");
+          if (!isVideoFile(file) && !isImageFile(file)) return t("upload.unsupported_type");
           if (file.size > NETPAN_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(NETPAN_MAX_FILE_SIZE / 1024 / 1024) });
           return null;
         },
         async (file) => {
-          const url = await uploadVideoToNetpan(file);
+          // Both images and videos selected here upload to netpan (not R2),
+          // so the button acts as a unified netpan media uploader.
+          const url = await uploadFileToNetpan(file);
+          if (isImageFile(file)) {
+            return buildMarkdownImage(file.name, url);
+          }
           return buildMarkdownVideo(file.name, url);
         },
         showAlert,
@@ -442,7 +447,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           onChange={upChange}
           className="hidden"
           type="file"
-          accept="video/*"
+          accept="video/*,image/*"
           multiple
         />
         <MarkdownToolButton
@@ -619,7 +624,20 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
             />
           ))}
           <span className="mx-1 hidden h-6 w-px bg-black/10 dark:bg-white/10 sm:block" aria-hidden="true" />
+          <span
+            className="hidden select-none text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500 sm:inline"
+            title={t("markdown_editor.upload_target.cloudflare")}
+          >
+            {t("markdown_editor.upload_target.cloudflare")}
+          </span>
           <UploadImageButton />
+          <span className="mx-1 hidden h-6 w-px bg-black/10 dark:bg-white/10 sm:block" aria-hidden="true" />
+          <span
+            className="hidden select-none text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500 sm:inline"
+            title={t("markdown_editor.upload_target.netpan")}
+          >
+            {t("markdown_editor.upload_target.netpan")}
+          </span>
           <UploadVideoButton />
           <UploadMusicButton />
           <UploadFileButton />
