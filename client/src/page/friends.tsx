@@ -46,6 +46,13 @@ async function publish({ name, avatar, desc, url, showAlert }: { name: string, a
     }
 }
 
+// 将友链地址规范为绝对地址（缺协议时补 https://），兼容历史数据中无协议的链接
+function toAbsoluteUrl(v: string): string {
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) return v;
+    if (v.startsWith('//')) return `https:${v}`;
+    return `https://${v}`;
+}
+
 export function FriendsPage() {
     const { t } = useTranslation()
     const siteConfig = useSiteConfig();
@@ -201,14 +208,14 @@ function Friend({ friend }: { friend: FriendItem }) {
     ]
     return (
         <>
-            <a title={friend.name} href={friend.url} target="_blank" className="bg-button w-full bg-w rounded-xl p-4 flex flex-col justify-center items-center relative">
+            <a title={friend.name} href={toAbsoluteUrl(friend.url)} target="_blank" className="bg-button w-full bg-w rounded-xl p-4 flex flex-col justify-center items-center relative">
                 <div className="w-16 h-16">
                     <img className={"rounded-full " + (friend.health.length > 0 ? "grayscale" : "")} src={friend.avatar} alt={friend.name}
                         onError={(e) => {
                             let host = '';
                             let proto = 'https:';
                             try {
-                                const u = new URL(friend.url);
+                                const u = new URL(toAbsoluteUrl(friend.url));
                                 host = u.host;
                                 proto = u.protocol;
                             } catch { /* ignore */ }

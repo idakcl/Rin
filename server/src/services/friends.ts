@@ -22,6 +22,16 @@ function faviconFallback(targetUrl: string): string {
     }
 }
 
+// 归一化友链地址：缺协议时补 https://，使链接跳转与图标解析都能正常工作。
+// 例：qq.com / www.qq.com / //qq.com 均会被规范为 https://www.qq.com
+function normalizeUrl(input: string): string {
+    const s = (typeof input === 'string') ? input.trim() : '';
+    if (!s) return s;
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) return s; // 已有协议（http/https/data: 等）
+    if (s.startsWith('//')) return `https:${s}`;        // 协议相对地址
+    return `https://${s}`;
+}
+
 /**
  * 从目标站点 HTML 中提取图标地址（优先 apple-touch-icon，其次 icon/shortcut icon）。
  * 抓取失败、超时或提取不到时，回退到公共 favicon 服务的真实图标地址。
@@ -129,7 +139,8 @@ export function FriendService(): Hono {
         const clientConfig = c.get('clientConfig');
         const serverConfig = c.get('serverConfig');
         const body = await profileAsync(c, 'friend_create_parse', () => c.req.json());
-        const { name, desc, avatar, url } = body;
+        const { name, desc, avatar, url: rawUrl } = body;
+        const url = normalizeUrl(rawUrl);
         const descStr = (typeof desc === 'string') ? desc.trim() : '';
         const avatarStr = (typeof avatar === 'string') ? avatar.trim() : '';
         
@@ -247,7 +258,7 @@ export function FriendService(): Hono {
             name: wrap(name),
             desc: wrap(desc),
             avatar: wrap(avatar),
-            url: wrap(url),
+            url: typeof url === 'string' ? wrap(normalizeUrl(url)) : undefined,
             accepted: finalAccepted === undefined ? undefined : finalAccepted,
             sort_order: finalSortOrder === undefined ? undefined : finalSortOrder,
         }).where(eq(friends.id, parseInt(id))));
