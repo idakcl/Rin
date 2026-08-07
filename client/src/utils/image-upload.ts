@@ -109,7 +109,10 @@ export function buildMarkdownVideo(_fileName: string, url: string) {
 export function buildMarkdownAudio(_fileName: string, url: string, autoplay = false) {
   const safeUrl = url.replace(/\s/g, "%20");
   const autoplayAttr = autoplay ? " autoplay" : "";
-  return `\n<audio src="${safeUrl}" controls${autoplayAttr} style="width:100%"></audio>\n`;
+  // Explicit height + display:block so the native controls (which need ~40px
+  // in dark-mode themes) don't get clipped, and the element doesn't collapse
+  // to inline. Wrapped in a div for reliable block-level spacing.
+  return `\n<div class="rin-audio-block" style="margin:0.75em 0"><audio src="${safeUrl}" controls${autoplayAttr} style="width:100%;height:40px;display:block"></audio></div>\n`;
 }
 
 // Markdown download link for a generic file uploaded via netpan.
