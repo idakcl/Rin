@@ -4,6 +4,11 @@ import { NETPAN_UPLOAD_URL, NETPAN_UPLOAD_TOKEN, NETPAN_BASE_URL } from "../netp
 
 export const DEFAULT_IMAGE_MAX_FILE_SIZE = 5 * 1024 * 1024;
 
+// Max size for video uploads routed through the Cloudflare R2 storage endpoint
+// (the first "upload image" button also accepts video). Kept in step with the
+// netpan 80MB ceiling; Cloudflare Workers caps request bodies around this range.
+export const DEFAULT_VIDEO_MAX_FILE_SIZE = 80 * 1024 * 1024;
+
 export type UploadedImageResult = {
   url: string;
   blurhash?: string;

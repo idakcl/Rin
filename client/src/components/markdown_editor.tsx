@@ -6,7 +6,7 @@ import Loading from 'react-loading';
 import { FlatInset, FlatTabButton } from "@rin/ui";
 import { useAlert } from "./dialog";
 import { useColorMode } from "../utils/darkModeUtils";
-import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE, isVideoFile, buildMarkdownVideo, uploadVideoToNetpan, isAudioFile, uploadFileToNetpan, buildMarkdownAudio, buildMarkdownFile } from "../utils/image-upload";
+import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE, DEFAULT_VIDEO_MAX_FILE_SIZE, isVideoFile, buildMarkdownVideo, uploadVideoToNetpan, isAudioFile, uploadFileToNetpan, buildMarkdownAudio, buildMarkdownFile } from "../utils/image-upload";
 import { NETPAN_MAX_FILE_SIZE } from "../netpan";
 import { Markdown } from "./markdown";
 
@@ -376,17 +376,31 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
       void insertMediaSequentially(
         files,
         (file) => {
-          if (!isImageFile(file)) return t("upload.image.invalid_type");
-          if (file.size > DEFAULT_IMAGE_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(DEFAULT_IMAGE_MAX_FILE_SIZE / 1024 / 1024) });
-          return null;
+          // The first button is backed by Cloudflare R2: images get the
+          // blurhash/metadata optimization path, videos upload raw (no
+          // transcode) — both land in the same R2 bucket.
+          if (isImageFile(file)) {
+            if (file.size > DEFAULT_IMAGE_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(DEFAULT_IMAGE_MAX_FILE_SIZE / 1024 / 1024) });
+            return null;
+          }
+          if (isVideoFile(file)) {
+            if (file.size > DEFAULT_VIDEO_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(DEFAULT_VIDEO_MAX_FILE_SIZE / 1024 / 1024) });
+            return null;
+          }
+          return t("upload.unsupported_type");
         },
         async (file) => {
+          // uploadImageFile skips metadata generation for non-images, so it
+          // safely uploads videos raw to R2 with no extra processing.
           const result = await uploadImageFile(file);
-          return buildMarkdownImage(file.name, result.url, {
-            blurhash: result.blurhash,
-            width: result.width,
-            height: result.height,
-          });
+          if (isImageFile(file)) {
+            return buildMarkdownImage(file.name, result.url, {
+              blurhash: result.blurhash,
+              width: result.width,
+              height: result.height,
+            });
+          }
+          return buildMarkdownVideo(file.name, result.url);
         },
         showAlert,
       );
@@ -399,7 +413,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           onChange={upChange}
           className="hidden"
           type="file"
-          accept="image/*"
+          accept="image/*,video/*"
           multiple
         />
         <MarkdownToolButton
