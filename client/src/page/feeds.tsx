@@ -46,8 +46,9 @@ export function FeedsPage() {
             const el = sentinelRef.current
             if (!el) return
             const rect = el.getBoundingClientRect()
+            console.log("[DBG fillShortPage] top=", Math.round(rect.top), "cond=", rect.top <= window.innerHeight + 800, "el?", !!el)
             if (rect.top <= window.innerHeight + 800) {
-                loadNext().then((ok) => { if (ok) requestAnimationFrame(fillShortPage) })
+                loadNext().then((ok) => { console.log("[DBG fillShortPage] loadNext ok=", ok); if (ok) requestAnimationFrame(fillShortPage) })
             }
         }
         loadInitial().then(() => {

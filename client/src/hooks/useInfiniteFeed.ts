@@ -84,6 +84,7 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
   const loadNext = useCallback((): Promise<boolean> => {
     if (loadingRef.current) return Promise.resolve(false)
     const target = bucketRef.current.nextPage
+    console.log("[DBG loadNext] ENTER target=", target, "hasNext=", bucketRef.current.hasNext, "loading=", loadingRef.current)
     if (!bucketRef.current.hasNext) return Promise.resolve(false)
 
     loadingRef.current = true
@@ -103,6 +104,7 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
         }
         const items = (data.data ?? []) as any[]
         const nextPage = target + 1
+        console.log("[DBG loadNext] APPEND target=", target, "items=", items.length, "nextPage=", nextPage, "hasNext=", data.hasNext)
         prefetchCache.current.delete(target)
         flush((prev) => ({
           items: [...prev.items, ...items],
