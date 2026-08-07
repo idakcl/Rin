@@ -637,17 +637,17 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
               onClick={action.onClick}
             />
           ))}
-          <span className="mx-1 hidden h-6 w-px bg-black/10 dark:bg-white/10 sm:block" aria-hidden="true" />
+          <span className="mx-1 h-6 w-px bg-black/10 dark:bg-white/10" aria-hidden="true" />
           <span
-            className="hidden select-none text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500 sm:inline"
+            className="select-none text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500"
             title={t("markdown_editor.upload_target.cloudflare")}
           >
             {t("markdown_editor.upload_target.cloudflare")}
           </span>
           <UploadImageButton />
-          <span className="mx-1 hidden h-6 w-px bg-black/10 dark:bg-white/10 sm:block" aria-hidden="true" />
+          <span className="mx-1 h-6 w-px bg-black/10 dark:bg-white/10" aria-hidden="true" />
           <span
-            className="hidden select-none text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500 sm:inline"
+            className="select-none text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500"
             title={t("markdown_editor.upload_target.netpan")}
           >
             {t("markdown_editor.upload_target.netpan")}
