@@ -31,6 +31,10 @@ export function isVideoFile(file: File) {
   return file.type.startsWith("video/");
 }
 
+export function isAudioFile(file: File) {
+  return file.type.startsWith("audio/");
+}
+
 function toPositiveInteger(value?: string | null) {
   if (!value) {
     return undefined;
@@ -93,6 +97,22 @@ export function buildMarkdownImage(fileName: string, url: string, metadata: Imag
 export function buildMarkdownVideo(_fileName: string, url: string) {
   const safeUrl = url.replace(/\s/g, "%20");
   return `\n<video src="${safeUrl}" controls style="max-width:100%"></video>\n`;
+}
+
+// Raw <audio> block for the markdown editor. `autoplay` controls whether the
+// audio starts playing when the article is opened. Wrapped in blank lines so
+// the rehype-raw renderer treats it as a block-level element.
+export function buildMarkdownAudio(_fileName: string, url: string, autoplay = false) {
+  const safeUrl = url.replace(/\s/g, "%20");
+  const autoplayAttr = autoplay ? " autoplay" : "";
+  return `\n<audio src="${safeUrl}" controls${autoplayAttr} style="width:100%"></audio>\n`;
+}
+
+// Markdown download link for a generic file uploaded via netpan.
+export function buildMarkdownFile(fileName: string, url: string) {
+  const safeName = fileName.replace(/[[\]]/g, "");
+  const safeUrl = url.replace(/\s/g, "%20");
+  return `\n[${safeName}](${safeUrl})\n`;
 }
 
 async function loadImage(file: File) {
@@ -290,11 +310,11 @@ export async function uploadImageFile(file: File): Promise<UploadedImageResult> 
   };
 }
 
-// Upload a video file directly to the user's private netpan (Sanyue ImgHub /
-// CloudFlare-ImgBed) and return the public URL. The endpoint accepts a
-// multipart `file` field and an `Authorization: Bearer <token>` header, and
+// Upload an arbitrary file directly to the user's private netpan (Sanyue
+// ImgHub / CloudFlare-ImgBed) and return the public URL. The endpoint accepts
+// a multipart `file` field and an `Authorization: Bearer <token>` header, and
 // responds with a JSON array like [{ src: "/file/xxx", publicUrl: "https://..." }].
-export async function uploadVideoToNetpan(file: File): Promise<string> {
+async function uploadToNetpan(file: File): Promise<string> {
   if (!NETPAN_UPLOAD_TOKEN) {
     throw new Error("未配置 netpan 上传 Token：请在仓库 Secrets 中添加 VITE_NETPAN_UPLOAD_TOKEN（需 upload 权限），并重新运行 Build");
   }
@@ -327,4 +347,13 @@ export async function uploadVideoToNetpan(file: File): Promise<string> {
     throw new Error("netpan 返回缺少文件 URL");
   }
   return raw.startsWith("http") ? raw : `${NETPAN_BASE_URL}${raw}`;
+}
+
+export async function uploadVideoToNetpan(file: File): Promise<string> {
+  return uploadToNetpan(file);
+}
+
+// Generic file upload (audio, documents, archives, etc.) backed by netpan.
+export async function uploadFileToNetpan(file: File): Promise<string> {
+  return uploadToNetpan(file);
 }

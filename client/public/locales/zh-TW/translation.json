@@ -147,6 +147,10 @@
       "list_item": "列表項目",
       "quote": "引用內容"
     },
+    "autoplay": {
+      "label": "自動播放",
+      "hint": "勾選後，讀者開啟文章時音樂自動播放（多數瀏覽器會封鎖帶聲音的自動播放，需使用者互動後才出聲）"
+    },
     "toolbar": {
       "bold": "粗體",
       "code_block": "程式碼區塊",
@@ -161,7 +165,9 @@
       "quote": "引用",
       "unordered_list": "無序列表",
       "upload_image": "上傳圖片",
-      "upload_video": "上傳影片"
+      "upload_video": "上傳影片",
+      "upload_music": "上傳音樂",
+      "upload_file": "新增檔案"
     }
   },
   "error": {
@@ -562,6 +568,9 @@
     "title": "上傳",
     "video": {
       "invalid_type": "請上傳影片檔案"
+    },
+    "music": {
+      "invalid_type": "請上傳音訊檔案"
     },
     "unsupported_type": "不支援的檔案類型（僅支援圖片與影片）"
   },

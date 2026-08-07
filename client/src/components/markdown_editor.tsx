@@ -6,7 +6,7 @@ import Loading from 'react-loading';
 import { FlatInset, FlatTabButton } from "@rin/ui";
 import { useAlert } from "./dialog";
 import { useColorMode } from "../utils/darkModeUtils";
-import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE, isVideoFile, buildMarkdownVideo, uploadVideoToNetpan } from "../utils/image-upload";
+import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE, isVideoFile, buildMarkdownVideo, uploadVideoToNetpan, isAudioFile, uploadFileToNetpan, buildMarkdownAudio, buildMarkdownFile } from "../utils/image-upload";
 import { NETPAN_MAX_FILE_SIZE } from "../netpan";
 import { Markdown } from "./markdown";
 
@@ -455,6 +455,103 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
     );
   }
 
+  function UploadMusicButton() {
+    const uploadRef = useRef<HTMLInputElement>(null);
+    const [autoplay, setAutoplay] = useState(false);
+    const label = t("markdown_editor.toolbar.upload_music");
+
+    const upChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(event.currentTarget.files ?? []);
+      event.currentTarget.value = "";
+      if (files.length === 0) return;
+      void insertMediaSequentially(
+        files,
+        (file) => {
+          if (!isAudioFile(file)) return t("upload.music.invalid_type");
+          if (file.size > NETPAN_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(NETPAN_MAX_FILE_SIZE / 1024 / 1024) });
+          return null;
+        },
+        async (file) => {
+          const url = await uploadFileToNetpan(file);
+          return buildMarkdownAudio(file.name, url, autoplay);
+        },
+        showAlert,
+      );
+    };
+
+    return (
+      <>
+        <input
+          ref={uploadRef}
+          onChange={upChange}
+          className="hidden"
+          type="file"
+          accept="audio/*"
+          multiple
+        />
+        <MarkdownToolButton
+          label={label}
+          icon="ri-music-2-line"
+          disabled={uploading}
+          onClick={() => uploadRef.current?.click()}
+        />
+        <label
+          className="flex shrink-0 cursor-pointer select-none items-center gap-1 text-xs text-neutral-500 hover:text-black dark:hover:text-white"
+          title={t("markdown_editor.autoplay.hint")}
+        >
+          <input
+            type="checkbox"
+            className="h-3.5 w-3.5 accent-theme"
+            checked={autoplay}
+            onChange={(event) => setAutoplay(event.target.checked)}
+          />
+          {t("markdown_editor.autoplay.label")}
+        </label>
+      </>
+    );
+  }
+
+  function UploadFileButton() {
+    const uploadRef = useRef<HTMLInputElement>(null);
+    const label = t("markdown_editor.toolbar.upload_file");
+
+    const upChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(event.currentTarget.files ?? []);
+      event.currentTarget.value = "";
+      if (files.length === 0) return;
+      void insertMediaSequentially(
+        files,
+        (file) => {
+          if (file.size > NETPAN_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(NETPAN_MAX_FILE_SIZE / 1024 / 1024) });
+          return null;
+        },
+        async (file) => {
+          const url = await uploadFileToNetpan(file);
+          return buildMarkdownFile(file.name, url);
+        },
+        showAlert,
+      );
+    };
+
+    return (
+      <>
+        <input
+          ref={uploadRef}
+          onChange={upChange}
+          className="hidden"
+          type="file"
+          multiple
+        />
+        <MarkdownToolButton
+          label={label}
+          icon="ri-file-3-line"
+          disabled={uploading}
+          onClick={() => uploadRef.current?.click()}
+        />
+      </>
+    );
+  }
+
   /* ---------------- Monaco Mount & IME Optimization ---------------- */
 
   const handleEditorMount = (editor: editor.IStandaloneCodeEditor) => {
@@ -524,6 +621,8 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           <span className="mx-1 hidden h-6 w-px bg-black/10 dark:bg-white/10 sm:block" aria-hidden="true" />
           <UploadImageButton />
           <UploadVideoButton />
+          <UploadMusicButton />
+          <UploadFileButton />
         </div>
         {uploading &&
           <div className="flex flex-row items-center space-x-2 px-2">

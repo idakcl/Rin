@@ -147,6 +147,10 @@
       "list_item": "List item",
       "quote": "Quote"
     },
+    "autoplay": {
+      "label": "Autoplay",
+      "hint": "When checked, music starts playing automatically when readers open the article (most browsers block autoplay with sound until user interaction)"
+    },
     "toolbar": {
       "bold": "Bold",
       "code_block": "Code block",
@@ -161,7 +165,9 @@
       "quote": "Quote",
       "unordered_list": "Unordered list",
       "upload_image": "Upload image",
-      "upload_video": "Upload Video"
+      "upload_video": "Upload Video",
+      "upload_music": "Upload Music",
+      "upload_file": "Add File"
     }
   },
   "error": {
@@ -562,6 +568,9 @@
     "title": "Upload",
     "video": {
       "invalid_type": "Please upload a video file"
+    },
+    "music": {
+      "invalid_type": "Please upload an audio file"
     },
     "unsupported_type": "Unsupported file type (only images and videos allowed)"
   },

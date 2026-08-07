@@ -147,6 +147,10 @@
       "list_item": "リスト項目",
       "quote": "引用"
     },
+    "autoplay": {
+      "label": "自動再生",
+      "hint": "チェックすると、読者が記事を開いたときに音楽が自動再生されます（多くのブラウザはユーザーの操作があるまで音声付きの自動再生をブロックします）"
+    },
     "toolbar": {
       "bold": "太字",
       "code_block": "コードブロック",
@@ -161,7 +165,9 @@
       "quote": "引用",
       "unordered_list": "箇条書き",
       "upload_image": "画像をアップロード",
-      "upload_video": "動画をアップロード"
+      "upload_video": "動画をアップロード",
+      "upload_music": "音楽をアップロード",
+      "upload_file": "ファイルを追加"
     }
   },
   "error": {
@@ -553,6 +559,9 @@
     "title": "アップロード",
     "video": {
       "invalid_type": "動画ファイルをアップロードしてください"
+    },
+    "music": {
+      "invalid_type": "音声ファイルをアップロードしてください"
     },
     "unsupported_type": "未対応のファイル形式（画像と動画のみ）"
   },

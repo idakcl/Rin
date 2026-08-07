@@ -147,6 +147,10 @@
       "list_item": "列表项",
       "quote": "引用内容"
     },
+    "autoplay": {
+      "label": "自动播放",
+      "hint": "勾选后，读者打开文章时音乐自动播放（多数浏览器会拦截带声音的自动播放，需用户交互后才出声）"
+    },
     "toolbar": {
       "bold": "加粗",
       "code_block": "代码块",
@@ -161,7 +165,9 @@
       "quote": "引用",
       "unordered_list": "无序列表",
       "upload_image": "上传图片",
-      "upload_video": "上传视频"
+      "upload_video": "上传视频",
+      "upload_music": "上传音乐",
+      "upload_file": "添加文件"
     }
   },
   "error": {
@@ -562,6 +568,9 @@
     "title": "上传",
     "video": {
       "invalid_type": "请上传视频文件"
+    },
+    "music": {
+      "invalid_type": "请上传音频文件"
     },
     "unsupported_type": "不支持的文件类型（仅支持图片和视频）"
   },
