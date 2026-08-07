@@ -42,20 +42,6 @@ export function FeedsPage() {
     useEffect(() => {
         let cancelled = false
         const page = tryInt(1, query.get("page"))
-        // 短首屏级联修复：哨兵挂载即处于「视口+800px 预触发区」时，IntersectionObserver
-        // 只触发一次且会被 loadInitial 的 flush 覆盖，导致预取的后续页永不追加。
-        // 这里主动级联 loadNext，直到页面变高可滚动或 hasNext=false。
-        const fillShortPage = () => {
-            const W = (window as any).__dbg = (window as any).__dbg || []
-            if (cancelled || !hasNextRef.current) { W.push("fsp STOP hasNext=" + hasNextRef.current); return }
-            const el = sentinelRef.current
-            if (!el) { W.push("fsp NO EL"); return }
-            const rect = el.getBoundingClientRect()
-            W.push("fsp top=" + Math.round(rect.top) + " cond=" + (rect.top <= window.innerHeight + 800) + " hasNext=" + hasNextRef.current)
-            if (rect.top <= window.innerHeight + 800) {
-                loadNext().then(() => requestAnimationFrame(fillShortPage))
-            }
-        }
         loadInitial().then(() => {
             if (cancelled) return
             // 深链 ?page=N：串行预热到该页（上限 MAX_DEEPLINK_PAGES），再粗略定位到底部
@@ -69,14 +55,16 @@ export function FeedsPage() {
                 requestAnimationFrame(() => {
                     window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" })
                 })
-                fillShortPage()
             })
         })
         return () => { cancelled = true }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loadInitial, query.get("page")])
 
-    // 抖音式：列表底部哨兵，进入视口前 800px 即触发下一页（数据若已预取则瞬时追加）
+    // 抖音式：底部哨兵观察 + 短首屏级联。
+    // 注意：外层 <Waiting> 在 loading 翻转时会重挂载哨兵（旧节点卸载、新节点挂载），
+    // 因此 observer 绝不能只观察一次（deps:[] 会盯着已卸载的旧节点，导致真实哨兵永远不触发——
+    // 无限滚动在长页面上其实也一直是坏的）。这里依赖 loading，哨兵重挂载后重新观察。
     useEffect(() => {
         const el = sentinelRef.current
         if (!el || typeof IntersectionObserver === "undefined") return
@@ -87,8 +75,19 @@ export function FeedsPage() {
             { rootMargin: "800px 0px" }
         )
         obs.observe(el)
+        // 短首屏：哨兵已在「视口 + 800px 预触发区」内（页面矮到滚不动），主动级联 loadNext，
+        // 直到页面变高可滚动（交给 observer）或 hasNext=false。用 rAF 确保哨兵已挂载、ref 有效。
+        const fill = () => {
+            if (!hasNextRef.current) return
+            const rect = el.getBoundingClientRect()
+            if (rect.top <= window.innerHeight + 800) {
+                loadNext().then(() => requestAnimationFrame(fill))
+            }
+        }
+        requestAnimationFrame(fill)
         return () => obs.disconnect()
-    }, [])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loading])
 
     return (
         <>
