@@ -46,6 +46,9 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
   const fetching = useRef<Set<number>>(new Set())
   const loadingRef = useRef(false)
   const mounted = useRef(true)
+  // 首屏加载完成前，禁止 loadNext 触发：否则挂载期哨兵 fill 会以 nextPage=1
+  // 抢跑抓取第 1 页并 append 到 loadInitial 的 SET 结果之上，导致整页文章重复。
+  const bootstrappedRef = useRef(false)
 
   useEffect(() => {
     mounted.current = true
@@ -82,6 +85,7 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
 
   /** 追加下一页：命中 prefetchCache 则瞬时挂载，否则走网络。返回是否成功追加 */
   const loadNext = useCallback((): Promise<boolean> => {
+    if (!bootstrappedRef.current) return Promise.resolve(false)
     if (loadingRef.current) return Promise.resolve(false)
     const target = bucketRef.current.nextPage
     if (!bucketRef.current.hasNext) return Promise.resolve(false)
@@ -129,6 +133,7 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
     prefetchCache.current.clear()
     fetching.current.clear()
     loadingRef.current = false
+    bootstrappedRef.current = false
     flush(() => ({ items: [], nextPage: 1, hasNext: true, loading: true, total: 0 }))
     return client.feed
       .list({ page: 1, limit, type })
@@ -144,6 +149,7 @@ export function useInfiniteFeed(type: FeedType, limit: number) {
           loading: false,
           total: data.size ?? 0,
         }))
+        bootstrappedRef.current = true
         prefetch(2)
         prefetch(3)
       })
