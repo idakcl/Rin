@@ -199,7 +199,13 @@ function AdminRoute({
     <Route path={path}>
       {(params) => (
         <AdminLayout title={title} description={description}>
-          {typeof content === "function" ? content(params) : content}
+          {/* 后台页（Health/QueueStatus/CompatTasks/Settings/Writing 等）已改为 lazy()，
+              必须套一层 Suspense 接住挂起，否则点进后台时懒加载组件挂起会抛
+              React #426 "suspended while responding to synchronous input" 白屏。
+              与前台 AppRoute 保持一致的写法。 */}
+          <Suspense fallback={null}>
+            {typeof content === "function" ? content(params) : content}
+          </Suspense>
         </AdminLayout>
       )}
     </Route>
