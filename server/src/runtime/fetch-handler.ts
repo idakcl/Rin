@@ -176,17 +176,13 @@ async function getSiteOg(request: Request, env: Env): Promise<OgData> {
   let description = "";
   let avatar = "";
   try {
-    const origin = new URL(request.url).origin;
-    // 同上：用已重写路径 /config(不经 /api 重写)
-    const cfgReq = new Request(new URL("/config", origin), request);
-    const res = await getApp().fetch(cfgReq, env);
-    if (res.ok) {
-      const data = (await res.json()) as any;
-      const site = data?.site ?? {};
-      name = site.name ?? data?.["site.name"] ?? "";
-      description = site.description ?? data?.["site.description"] ?? "";
-      avatar = site.avatar ?? data?.["site.avatar"] ?? "";
-    }
+    // 站点名/描述/头像由部署时通过 wrangler [vars] 注入 Worker 环境变量，直接读取即可。
+    // 不走 /config 端点：该端点需要管理员鉴权，OG 预览的内部请求会拿到 401，
+    // 导致卡片只剩 og:type/og:url，缺标题/描述/封面。env vars 即站点配置来源，无需鉴权。
+    const ev = env as unknown as Record<string, any>;
+    name = typeof ev?.NAME === "string" ? ev.NAME : "";
+    description = typeof ev?.DESCRIPTION === "string" ? ev.DESCRIPTION : "";
+    avatar = typeof ev?.AVATAR === "string" ? ev.AVATAR : "";
   } catch {
     /* 取不到就用空值，文章卡片不受影响 */
   }
