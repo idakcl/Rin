@@ -44,6 +44,8 @@ export function FeedsPage() {
         const page = tryInt(1, query.get("page"))
         loadInitial().then(() => {
             if (cancelled) return
+            // 普通首页（?page 缺省或 =1）不滚动，保持顶部；仅深链 ?page=N (N>1) 才预热后滚到底部
+            if (page <= 1) return
             // 深链 ?page=N：串行预热到该页（上限 MAX_DEEPLINK_PAGES），再粗略定位到底部
             const target = Math.min(page, MAX_DEEPLINK_PAGES)
             let chain: Promise<unknown> = Promise.resolve()
