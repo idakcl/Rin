@@ -1,6 +1,6 @@
 import i18n from 'i18next';
 import _ from 'lodash';
-import {useCallback, useEffect, useState} from "react";
+import {lazy, Suspense, useCallback, useEffect, useState} from "react";
 import {Helmet} from "react-helmet";
 import {useTranslation} from "react-i18next";
 import Loading from 'react-loading';
@@ -11,8 +11,11 @@ import { client } from "../app/runtime";
 import {Cache} from '../utils/cache';
 import {useSiteConfig} from "../hooks/useSiteConfig";
 import {siteName} from "../utils/constants";
-import mermaid from 'mermaid';
-import { MarkdownEditor } from '../components/markdown_editor';
+
+// 写作编辑器（含 monaco-editor ~2MB）按需懒加载，移出首屏 bundle
+const MarkdownEditor = lazy(() =>
+  import("../components/markdown_editor").then((m) => ({ default: m.MarkdownEditor })),
+);
 
 async function publish({
   title,
@@ -205,23 +208,20 @@ export function WritingPage({ id }: { id?: number }) {
   }, [id]);
   const debouncedUpdate = useCallback(
     _.debounce(() => {
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: "default",
-      });
-      mermaid.run({
-        suppressErrors: true,
-        nodes: document.querySelectorAll("pre.mermaid_default")
-      }).then(()=>{
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: "dark",
-        });
-        mermaid.run({
+      // mermaid 体积大，按需动态加载
+      void (async () => {
+        const mermaid = (await import("mermaid")).default;
+        mermaid.initialize({ startOnLoad: false, theme: "default" });
+        await mermaid.run({
           suppressErrors: true,
-          nodes: document.querySelectorAll("pre.mermaid_dark")
+          nodes: document.querySelectorAll("pre.mermaid_default"),
         });
-      })
+        mermaid.initialize({ startOnLoad: false, theme: "dark" });
+        await mermaid.run({
+          suppressErrors: true,
+          nodes: document.querySelectorAll("pre.mermaid_dark"),
+        });
+      })();
     }, 100),
     []
   );
@@ -339,7 +339,9 @@ export function WritingPage({ id }: { id?: number }) {
         {MetaInput({ className: "p-4 sm:p-5 md:p-6" })}
 
         <FlatPanel className="overflow-hidden p-0">
-          <MarkdownEditor content={content} setContent={setContent} height='680px' />
+          <Suspense fallback={null}>
+            <MarkdownEditor content={content} setContent={setContent} height='680px' />
+          </Suspense>
         </FlatPanel>
       </div>
       <AlertUI />

@@ -17,7 +17,6 @@ import { siteName } from "../utils/constants";
 import { timeago } from "../utils/timeago";
 import { Button } from "../components/button";
 import { Tips } from "../components/tips";
-import mermaid from "mermaid";
 import { AdjacentSection } from "../components/adjacent_feed.tsx";
 import { stripImageUrlMetadata } from "../utils/image-upload";
 
@@ -112,23 +111,26 @@ export function FeedPage({ id, TOC, clean }: { id: string, TOC: () => JSX.Elemen
     ref.current = id;
   }, [id]);
   useEffect(() => {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: "default",
-    });
-    mermaid.run({
-      suppressErrors: true,
-      nodes: document.querySelectorAll("pre.mermaid_default")
-    }).then(() => {
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: "dark",
-      });
-      mermaid.run({
+    let cancelled = false;
+    // mermaid 体积大（~2MB），改为按需动态加载，移出首屏 bundle
+    void (async () => {
+      const mermaid = (await import("mermaid")).default;
+      if (cancelled) return;
+      mermaid.initialize({ startOnLoad: false, theme: "default" });
+      await mermaid.run({
         suppressErrors: true,
-        nodes: document.querySelectorAll("pre.mermaid_dark")
+        nodes: document.querySelectorAll("pre.mermaid_default"),
       });
-    })
+      if (cancelled) return;
+      mermaid.initialize({ startOnLoad: false, theme: "dark" });
+      await mermaid.run({
+        suppressErrors: true,
+        nodes: document.querySelectorAll("pre.mermaid_dark"),
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [feed]);
 
   return (

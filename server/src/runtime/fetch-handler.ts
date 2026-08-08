@@ -33,7 +33,15 @@ async function tryServeAsset(request: Request, env: Env) {
   try {
     const asset = await env.ASSETS.fetch(request);
     if (asset.status === 200 || (asset.status >= 300 && asset.status < 400)) {
-      return asset;
+      // 带 content-hash 的文件名天然支持长缓存：显式设为 immutable，
+      // 让 CDN 边缘长期缓存、不再每次 revalidate（修复 max-age=0 导致重复下载）。
+      const headers = new Headers(asset.headers);
+      headers.set("Cache-Control", "public, max-age=31536000, immutable");
+      return new Response(asset.body, {
+        status: asset.status,
+        statusText: asset.statusText,
+        headers,
+      });
     }
   } catch {}
 
