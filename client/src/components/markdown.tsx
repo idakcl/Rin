@@ -345,12 +345,16 @@ function MarkdownVideo({
   // 仅用 parseImageUrlMetadata 解析 poster 里的尺寸/blurhash，用于预留空间与占位。
   const posterMeta = poster ? parseImageUrlMetadata(poster) : undefined;
   const posterSrc = posterMeta?.src;
-  // 预留宽高比：有 poster 尺寸用 poster 比例，否则退化为 16:9，确保视频加载前
-  // 就占住高度，不会在元数据/首帧就绪时把下方内容突然挤下去。
-  const ratio =
+  // 渐进式还原视频原始尺寸，避免强制 16:9 容器让竖屏视频出现左右黑边：
+  // 1) 初次渲染：按 poster 比例(或 16:9)占位，预留高度避免 loadedmetadata 前的 CLS；
+  // 2) onLoadedMetadata 后：用 videoWidth/videoHeight 探测真实比例替换容器，
+  //    此时 <video object-contain> 恰好铺满容器、无黑边。
+  const initialRatio =
     posterMeta?.width && posterMeta?.height
       ? `${posterMeta.width} / ${posterMeta.height}`
       : "16 / 9";
+  const [videoRatio, setVideoRatio] = useState<string | null>(null);
+  const ratio = videoRatio ?? initialRatio;
   const [posterReady, setPosterReady] = useState(false);
 
   return (
@@ -365,21 +369,27 @@ function MarkdownVideo({
           aria-hidden="true"
           onLoad={() => setPosterReady(true)}
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
-            posterReady ? "opacity-100" : "opacity-0"
+            videoRatio ? "opacity-0" : posterReady ? "opacity-100" : "opacity-0"
           }`}
         />
-      ) : (
+      ) : !videoRatio ? (
         <span
           aria-hidden="true"
           className="absolute inset-0 block animate-pulse bg-gradient-to-br from-black/5 to-black/10 dark:from-white/5 dark:to-white/10"
         />
-      )}
+      ) : null}
       <video
         src={src}
         poster={posterSrc}
         controls
         preload="metadata"
         playsInline
+        onLoadedMetadata={(e) => {
+          const v = e.currentTarget;
+          if (v.videoWidth && v.videoHeight) {
+            setVideoRatio(`${v.videoWidth} / ${v.videoHeight}`);
+          }
+        }}
         className="absolute inset-0 h-full w-full bg-black object-contain"
       />
     </div>
