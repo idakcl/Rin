@@ -413,6 +413,7 @@ function MarkdownVideo({
       <video
         ref={videoRef}
         src={src}
+        poster={posterSrc}
         controls
         preload="metadata"
         playsInline
