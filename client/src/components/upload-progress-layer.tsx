@@ -5,7 +5,7 @@ import {
   removeAllFinished,
   countUploads,
   retryUpload,
-  retryAll,
+  retryErrors,
   retryCancelled,
   cancelUpload,
   clearAll,
@@ -221,7 +221,7 @@ export function UploadProgressLayer() {
             <button
               type="button"
               onClick={() => {
-                retryAll();
+                retryErrors();
                 retryCancelled();
               }}
               title={t("upload.progress.retry_all")}

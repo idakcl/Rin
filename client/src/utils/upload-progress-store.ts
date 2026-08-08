@@ -85,9 +85,13 @@ export function retryUpload(id: string): void {
   if (fn) void fn();
 }
 
-export function retryAll(): void {
-  for (const fn of retryMap.values()) {
-    void fn();
+// 重传所有「失败(error)」条目。只针对失败项，不碰已成功 / 上传中 / 排队中的条目，
+// 否则会把已插入编辑器的内容重复上传再插入，造成重复。
+export function retryErrors(): void {
+  for (const it of items) {
+    if (it.status === "error") {
+      retryMap.get(it.id)?.();
+    }
   }
 }
 
