@@ -35,8 +35,8 @@ import { useImageLoadState } from "../utils/use-image-load-state";
 const MAX_CONCURRENT_IMAGES = 12;
 // 以当前浏览位置（视口中心）为基准，上下各预下载的图片张数。
 // 只激活窗口内的图片去加载，不激活整篇文章几十张，避免并发洪泛。
-const PRELOAD_AHEAD = 12;
-const PRELOAD_BEHIND = 12;
+const PRELOAD_AHEAD = 6;
+const PRELOAD_BEHIND = 6;
 
 type ImageLoadEntry = {
   el: HTMLImageElement;
