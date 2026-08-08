@@ -586,6 +586,7 @@
       "failed": "{{count}} failed",
       "retry": "Retry",
       "retry_all": "Retry all",
+      "retry_failed": "Retry all failed",
       "close": "Close",
       "cancel": "Cancel",
       "done_collapsed": "{{count}} done",

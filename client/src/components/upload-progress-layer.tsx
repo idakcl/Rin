@@ -201,7 +201,7 @@ export function UploadProgressLayer() {
     );
   }
 
-  const hasRetryable = counts.error > 0 || counts.cancelled > 0;
+  const hasFailed = counts.error > 0;
 
   return (
     <div className="fixed bottom-4 right-4 z-50 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-black/10 bg-w shadow-2xl shadow-black/20 dark:border-white/10 dark:bg-neutral-900">
@@ -217,18 +217,15 @@ export function UploadProgressLayer() {
           )}
         </div>
         <div className="flex items-center gap-1">
-          {hasRetryable && (
+          {hasFailed && (
             <button
               type="button"
-              onClick={() => {
-                retryErrors();
-                retryCancelled();
-              }}
-              title={t("upload.progress.retry_all")}
+              onClick={() => retryErrors()}
+              title={t("upload.progress.retry_failed")}
               className="flex h-6 items-center gap-1 rounded-lg bg-black/[0.04] px-2 text-[11px] font-medium text-theme transition-colors hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20"
             >
               <span aria-hidden>↻</span>
-              {t("upload.progress.retry_all")}
+              {t("upload.progress.retry_failed")}
             </button>
           )}
           <button

@@ -586,6 +586,7 @@
       "failed": "{{count}} 項失敗",
       "retry": "重新上傳",
       "retry_all": "全部重新上傳",
+      "retry_failed": "失敗的全部重新上傳",
       "close": "關閉",
       "cancel": "取消",
       "done_collapsed": "已完成 {{count}} 項",

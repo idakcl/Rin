@@ -577,6 +577,7 @@
       "failed": "{{count}} 件失敗",
       "retry": "再試行",
       "retry_all": "すべて再試行",
+      "retry_failed": "失敗をすべて再試行",
       "close": "閉じる",
       "cancel": "キャンセル",
       "done_collapsed": "{{count}} 件完了",
