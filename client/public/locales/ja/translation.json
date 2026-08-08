@@ -567,7 +567,17 @@
     "music": {
       "invalid_type": "音声ファイルをアップロードしてください"
     },
-    "unsupported_type": "未対応のファイル形式（画像と動画のみ）"
+    "unsupported_type": "未対応のファイル形式（画像と動画のみ）",
+    "progress": {
+      "uploading": "アップロード中 {{uploading}}",
+      "queued": "待機中 {{queued}}",
+      "queued_collapsed": "ほか {{count}} 件待機中",
+      "footer": "合計 {{total}} 件 · 完了 {{done}} · 同時上限 {{limit}}",
+      "minimized": "{{count}} 件アップロード中",
+      "failed": "{{count}} 件失敗",
+      "retry": "再試行",
+      "retry_all": "すべて再試行"
+    }
   },
   "uploading": "アップロード中",
   "url": "サイトURL",

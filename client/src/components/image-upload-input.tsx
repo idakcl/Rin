@@ -6,6 +6,8 @@ import {
   isImageFile,
   uploadImageFile,
 } from "../utils/image-upload";
+import { addUpload, setUploadStatus, setUploadProgress, registerRetry } from "../utils/upload-progress-store";
+import { acquireWakeLock, releaseWakeLock } from "../utils/wake-lock";
 
 type ImageUploadInputProps = {
   value: string;
@@ -48,14 +50,30 @@ export function ImageUploadInput({
       return;
     }
 
+    const id = addUpload(file.name);
+
+    // 重传闭包：失败后在悬浮窗点「重新上传」时回调。
+    const retryAvatar = async () => {
+      setUploadStatus(id, "uploading");
+      try {
+        const result = await uploadImageFile(file, (pct) => setUploadProgress(id, pct));
+        onChange(result.url);
+        setUploadStatus(id, "done");
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : t("upload.failed");
+        setUploadStatus(id, "error", msg);
+        showError(msg);
+      }
+    };
+    registerRetry(id, retryAvatar);
+
     setUploading(true);
+    await acquireWakeLock();
     try {
-      const result = await uploadImageFile(file);
-      onChange(result.url);
-    } catch (error) {
-      showError(error instanceof Error ? error.message : t("upload.failed"));
+      await retryAvatar();
     } finally {
       setUploading(false);
+      releaseWakeLock();
       if (inputRef.current) {
         inputRef.current.value = "";
       }

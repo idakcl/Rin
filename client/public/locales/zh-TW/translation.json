@@ -576,7 +576,17 @@
     "music": {
       "invalid_type": "請上傳音訊檔案"
     },
-    "unsupported_type": "不支援的檔案類型（僅支援圖片與影片）"
+    "unsupported_type": "不支援的檔案類型（僅支援圖片與影片）",
+    "progress": {
+      "uploading": "上傳中 {{uploading}}",
+      "queued": "排隊 {{queued}}",
+      "queued_collapsed": "還有 {{count}} 項排隊中",
+      "footer": "共 {{total}} 項 · 完成 {{done}} · 並發上限 {{limit}}",
+      "minimized": "{{count}} 項上傳中",
+      "failed": "{{count}} 項失敗",
+      "retry": "重新上傳",
+      "retry_all": "全部重新上傳"
+    }
   },
   "uploading": "上傳中",
   "url": "網站 URL",

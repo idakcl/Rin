@@ -576,7 +576,17 @@
     "music": {
       "invalid_type": "请上传音频文件"
     },
-    "unsupported_type": "不支持的文件类型（仅支持图片和视频）"
+    "unsupported_type": "不支持的文件类型（仅支持图片和视频）",
+    "progress": {
+      "uploading": "上传中 {{uploading}}",
+      "queued": "排队 {{queued}}",
+      "queued_collapsed": "还有 {{count}} 项排队中",
+      "footer": "共 {{total}} 项 · 完成 {{done}} · 并发上限 {{limit}}",
+      "minimized": "{{count}} 项上传中",
+      "failed": "{{count}} 项失败",
+      "retry": "重新上传",
+      "retry_all": "全部重新上传"
+    }
   },
   "uploading": "上传中",
   "url": "站点 URL",

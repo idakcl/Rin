@@ -576,7 +576,17 @@
     "music": {
       "invalid_type": "Please upload an audio file"
     },
-    "unsupported_type": "Unsupported file type (only images and videos allowed)"
+    "unsupported_type": "Unsupported file type (only images and videos allowed)",
+    "progress": {
+      "uploading": "Uploading {{uploading}}",
+      "queued": "Queued {{queued}}",
+      "queued_collapsed": "{{count}} more queued",
+      "footer": "{{total}} total · {{done}} done · limit {{limit}}",
+      "minimized": "{{count}} uploading",
+      "failed": "{{count}} failed",
+      "retry": "Retry",
+      "retry_all": "Retry all"
+    }
   },
   "uploading": "Uploading...",
   "url": "Site URL",
