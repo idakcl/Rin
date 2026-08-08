@@ -194,6 +194,9 @@ export async function runCloudflareDeploy(target: "all" | "server" | "client" = 
       [assets]
       directory = "./dist/client"
       binding = "ASSETS"
+      run_worker_first = true
+      not_found_handling = "single-page-application"
+      cache_control = "public, max-age=31536000, immutable"
       ${buildWranglerTriggersConfig(preview)}
       ${buildWranglerObservabilityConfig(preview)}
 
