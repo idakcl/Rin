@@ -585,7 +585,11 @@
       "minimized": "{{count}} 项上传中",
       "failed": "{{count}} 项失败",
       "retry": "重新上传",
-      "retry_all": "全部重新上传"
+      "retry_all": "全部重新上传",
+      "close": "关闭",
+      "cancel": "取消",
+      "done_collapsed": "已完成 {{count}} 项",
+      "cancelled_collapsed": "已取消 {{count}} 项"
     }
   },
   "uploading": "上传中",

@@ -585,7 +585,11 @@
       "minimized": "{{count}} uploading",
       "failed": "{{count}} failed",
       "retry": "Retry",
-      "retry_all": "Retry all"
+      "retry_all": "Retry all",
+      "close": "Close",
+      "cancel": "Cancel",
+      "done_collapsed": "{{count}} done",
+      "cancelled_collapsed": "{{count}} cancelled"
     }
   },
   "uploading": "Uploading...",

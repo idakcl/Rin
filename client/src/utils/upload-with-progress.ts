@@ -23,6 +23,7 @@ export function uploadToStorageWithProgress(
   file: File,
   key: string | undefined,
   onProgress?: ProgressFn,
+  signal?: AbortSignal,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -32,6 +33,14 @@ export function uploadToStorageWithProgress(
       xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     }
     xhr.withCredentials = true;
+
+    if (signal) {
+      if (signal.aborted) {
+        reject(new DOMException("Upload cancelled", "AbortError"));
+        return;
+      }
+      signal.addEventListener("abort", () => xhr.abort(), { once: true });
+    }
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {
@@ -59,7 +68,7 @@ export function uploadToStorageWithProgress(
     };
 
     xhr.onerror = () => reject(new Error("Network error"));
-    xhr.onabort = () => reject(new Error("Upload aborted"));
+    xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
 
     const form = new FormData();
     form.append("file", file);
@@ -72,6 +81,7 @@ export function uploadToStorageWithProgress(
 export function uploadToNetpanWithProgress(
   file: File,
   onProgress?: ProgressFn,
+  signal?: AbortSignal,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     if (!NETPAN_UPLOAD_TOKEN) {
@@ -86,6 +96,14 @@ export function uploadToNetpanWithProgress(
     const xhr = new XMLHttpRequest();
     xhr.open("POST", NETPAN_UPLOAD_URL);
     xhr.setRequestHeader("Authorization", `Bearer ${NETPAN_UPLOAD_TOKEN}`);
+
+    if (signal) {
+      if (signal.aborted) {
+        reject(new DOMException("Upload cancelled", "AbortError"));
+        return;
+      }
+      signal.addEventListener("abort", () => xhr.abort(), { once: true });
+    }
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {
@@ -120,10 +138,16 @@ export function uploadToNetpanWithProgress(
     };
 
     xhr.onerror = () => reject(new Error("Network error"));
-    xhr.onabort = () => reject(new Error("Upload aborted"));
+    xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
 
     const form = new FormData();
     form.append("file", file);
     xhr.send(form);
   });
+}
+
+// 判断上传错误是否由用户取消（abort）引起，便于调用方将其标记为
+// 「已取消」而非「失败」。
+export function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }

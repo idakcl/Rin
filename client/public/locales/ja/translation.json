@@ -576,7 +576,11 @@
       "minimized": "{{count}} 件アップロード中",
       "failed": "{{count}} 件失敗",
       "retry": "再試行",
-      "retry_all": "すべて再試行"
+      "retry_all": "すべて再試行",
+      "close": "閉じる",
+      "cancel": "キャンセル",
+      "done_collapsed": "{{count}} 件完了",
+      "cancelled_collapsed": "{{count}} 件キャンセル"
     }
   },
   "uploading": "アップロード中",

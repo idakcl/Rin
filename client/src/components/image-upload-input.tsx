@@ -6,7 +6,8 @@ import {
   isImageFile,
   uploadImageFile,
 } from "../utils/image-upload";
-import { addUpload, setUploadStatus, setUploadProgress, registerRetry } from "../utils/upload-progress-store";
+import { addUpload, setUploadStatus, setUploadProgress, setUploadUrl, registerRetry, registerAbort } from "../utils/upload-progress-store";
+import { isAbortError } from "../utils/upload-with-progress";
 import { acquireWakeLock, releaseWakeLock } from "../utils/wake-lock";
 
 type ImageUploadInputProps = {
@@ -55,11 +56,18 @@ export function ImageUploadInput({
     // 重传闭包：失败后在悬浮窗点「重新上传」时回调。
     const retryAvatar = async () => {
       setUploadStatus(id, "uploading");
+      const controller = new AbortController();
+      registerAbort(id, () => controller.abort());
       try {
-        const result = await uploadImageFile(file, (pct) => setUploadProgress(id, pct));
+        const result = await uploadImageFile(file, (pct) => setUploadProgress(id, pct), controller.signal);
         onChange(result.url);
+        setUploadUrl(id, result.url);
         setUploadStatus(id, "done");
       } catch (error) {
+        if (isAbortError(error)) {
+          setUploadStatus(id, "cancelled");
+          return;
+        }
         const msg = error instanceof Error ? error.message : t("upload.failed");
         setUploadStatus(id, "error", msg);
         showError(msg);

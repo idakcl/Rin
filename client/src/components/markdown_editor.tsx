@@ -10,7 +10,8 @@ import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FIL
 import { NETPAN_MAX_FILE_SIZE } from "../netpan";
 import { Markdown } from "./markdown";
 import { mapWithConcurrency } from "../utils/concurrency";
-import { addUpload, setUploadStatus, setUploadProgress, registerRetry } from "../utils/upload-progress-store";
+import { addUpload, setUploadStatus, setUploadProgress, setUploadUrl, registerRetry, registerAbort } from "../utils/upload-progress-store";
+import { isAbortError } from "../utils/upload-with-progress";
 import { acquireWakeLock, releaseWakeLock } from "../utils/wake-lock";
 
 // 与上传悬浮窗并发显示上限一致（见 utils/concurrency.ts）。
@@ -91,8 +92,10 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
     // 重传闭包：失败后在悬浮窗点「重新上传」时回调，重传到原位置。
     const retryInsert = async () => {
       setUploadStatus(id, "uploading");
+      const controller = new AbortController();
+      registerAbort(id, () => controller.abort());
       try {
-        const result = await uploadImageFile(file, (pct) => setUploadProgress(id, pct));
+        const result = await uploadImageFile(file, (pct) => setUploadProgress(id, pct), controller.signal);
         const editorInstance = editorRef.current;
         if (!editorInstance) return;
         const imageText = buildMarkdownImage(file.name, result.url, {
@@ -105,8 +108,13 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           text: imageText,
         }]);
         editorInstance.focus();
+        setUploadUrl(id, result.url);
         setUploadStatus(id, "done");
       } catch (error) {
+        if (isAbortError(error)) {
+          setUploadStatus(id, "cancelled");
+          return;
+        }
         console.error(error);
         const msg = error instanceof Error ? error.message : t("upload.failed");
         setUploadStatus(id, "error", msg);
@@ -146,7 +154,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
   const insertMediaSequentially = async (
     files: FileList | File[],
     validate: (file: File) => string | null,
-    produce: (file: File, onProgress: (pct: number) => void) => Promise<string>,
+    produce: (file: File, onProgress: (pct: number) => void, signal: AbortSignal) => Promise<{ snippet: string; url: string }>,
     showAlert: (msg: string) => void,
   ) => {
     const editorInstance = editorRef.current;
@@ -174,12 +182,19 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
         showAlert(error);
         return null;
       }
+      const controller = new AbortController();
+      registerAbort(id, () => controller.abort());
       try {
         setUploadStatus(id, "uploading");
-        const snippet = await produce(file, (pct) => setUploadProgress(id, pct));
+        const { snippet, url } = await produce(file, (pct) => setUploadProgress(id, pct), controller.signal);
+        if (url) setUploadUrl(id, url);
         setUploadStatus(id, "done");
         return snippet;
       } catch (e) {
+        if (isAbortError(e)) {
+          setUploadStatus(id, "cancelled");
+          return null;
+        }
         const msg = e instanceof Error ? e.message : t("upload.failed");
         setUploadStatus(id, "error", msg);
         showAlert(msg);
@@ -466,23 +481,29 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           }
           return t("upload.unsupported_type");
         },
-        async (file, onProgress) => {
+        async (file, onProgress, signal) => {
           // uploadImageFile skips metadata generation for non-images, so it
           // safely uploads videos raw to R2 with no extra processing.
-          const result = await uploadImageFile(file, onProgress);
+          const result = await uploadImageFile(file, onProgress, signal);
           if (isImageFile(file)) {
-            return buildMarkdownImage(file.name, result.url, {
-              blurhash: result.blurhash,
-              width: result.width,
-              height: result.height,
-            });
+            return {
+              snippet: buildMarkdownImage(file.name, result.url, {
+                blurhash: result.blurhash,
+                width: result.width,
+                height: result.height,
+              }),
+              url: result.url,
+            };
           }
           // For videos, try to generate a poster frame so mobile Safari
           // shows a thumbnail before play (it ignores the #t= media
           // fragment). Poster upload is best-effort; failures silently fall
           // back to no poster.
           const posterUrl = await attachVideoPoster(result.url);
-          return buildMarkdownVideo(file.name, result.url, posterUrl ?? undefined);
+          return {
+            snippet: buildMarkdownVideo(file.name, result.url, posterUrl ?? undefined),
+            url: result.url,
+          };
         },
         showAlert,
       );
@@ -523,18 +544,21 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           if (file.size > NETPAN_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(NETPAN_MAX_FILE_SIZE / 1024 / 1024) });
           return null;
         },
-        async (file, onProgress) => {
+        async (file, onProgress, signal) => {
           // Both images and videos selected here upload to netpan (not R2),
           // so the button acts as a unified netpan media uploader.
-          const url = await uploadFileToNetpan(file, onProgress);
+          const url = await uploadFileToNetpan(file, onProgress, signal);
           if (isImageFile(file)) {
-            return buildMarkdownImage(file.name, url);
+            return { snippet: buildMarkdownImage(file.name, url), url };
           }
           // Videos: generate a poster frame so the unplayed preview shows
           // on mobile Safari (which ignores the #t= media fragment trick).
           // attachVideoPoster uploads the poster to R2; failures are silent.
           const posterUrl = await attachVideoPoster(url);
-          return buildMarkdownVideo(file.name, url, posterUrl ?? undefined);
+          return {
+            snippet: buildMarkdownVideo(file.name, url, posterUrl ?? undefined),
+            url,
+          };
         },
         showAlert,
       );
@@ -576,9 +600,9 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           if (file.size > NETPAN_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(NETPAN_MAX_FILE_SIZE / 1024 / 1024) });
           return null;
         },
-        async (file, onProgress) => {
-          const url = await uploadFileToNetpan(file, onProgress);
-          return buildMarkdownAudio(file.name, url, autoplay);
+        async (file, onProgress, signal) => {
+          const url = await uploadFileToNetpan(file, onProgress, signal);
+          return { snippet: buildMarkdownAudio(file.name, url, autoplay), url };
         },
         showAlert,
       );
@@ -630,9 +654,9 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           if (file.size > NETPAN_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(NETPAN_MAX_FILE_SIZE / 1024 / 1024) });
           return null;
         },
-        async (file, onProgress) => {
-          const url = await uploadFileToNetpan(file, onProgress);
-          return buildMarkdownFile(file.name, url);
+        async (file, onProgress, signal) => {
+          const url = await uploadFileToNetpan(file, onProgress, signal);
+          return { snippet: buildMarkdownFile(file.name, url), url };
         },
         showAlert,
       );
@@ -770,17 +794,20 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
                   }
                   return t("upload.unsupported_type");
                 },
-                async (file, onProgress) => {
+                async (file, onProgress, signal) => {
                   if (isImageFile(file)) {
-                    const result = await uploadImageFile(file, onProgress);
-                    return buildMarkdownImage(file.name, result.url, {
-                      blurhash: result.blurhash,
-                      width: result.width,
-                      height: result.height,
-                    });
+                    const result = await uploadImageFile(file, onProgress, signal);
+                    return {
+                      snippet: buildMarkdownImage(file.name, result.url, {
+                        blurhash: result.blurhash,
+                        width: result.width,
+                        height: result.height,
+                      }),
+                      url: result.url,
+                    };
                   }
-                  const url = await uploadVideoToNetpan(file, onProgress);
-                  return buildMarkdownVideo(file.name, url);
+                  const url = await uploadVideoToNetpan(file, onProgress, signal);
+                  return { snippet: buildMarkdownVideo(file.name, url), url };
                 },
                 showAlert,
               );

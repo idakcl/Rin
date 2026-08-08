@@ -311,9 +311,10 @@ export async function enrichMarkdownImageMetadata(content: string): Promise<Mark
 export async function uploadImageFile(
   file: File,
   onProgress?: (pct: number) => void,
+  signal?: AbortSignal,
 ): Promise<UploadedImageResult> {
   const [uploadResult, metadataResult] = await Promise.allSettled([
-    uploadToStorageWithProgress(file, file.name, onProgress),
+    uploadToStorageWithProgress(file, file.name, onProgress, signal),
     generateImageMetadata(file),
   ]);
 
@@ -340,16 +341,18 @@ export async function uploadImageFile(
 export async function uploadVideoToNetpan(
   file: File,
   onProgress?: (pct: number) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
-  return uploadToNetpanWithProgress(file, onProgress);
+  return uploadToNetpanWithProgress(file, onProgress, signal);
 }
 
 // Generic file upload (audio, documents, archives, etc.) backed by netpan.
 export async function uploadFileToNetpan(
   file: File,
   onProgress?: (pct: number) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
-  return uploadToNetpanWithProgress(file, onProgress);
+  return uploadToNetpanWithProgress(file, onProgress, signal);
 }
 
 // ---------------------------------------------------------------------------
