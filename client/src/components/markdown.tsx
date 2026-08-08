@@ -155,9 +155,15 @@ function MarkdownImage({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { src: cleanSrc, blurhash, width, height } = parseImageUrlMetadata(src);
   const [actualSrc, setActualSrc] = useState<string | undefined>(undefined);
+  const [naturalRatio, setNaturalRatio] = useState<string | undefined>(undefined);
   const { failed, imageRef, loaded, onError, onLoad } = useImageLoadState(actualSrc);
   const roundedClass = rounded ? "rounded-xl" : "";
-  const aspectRatio = width && height ? `${width} / ${height}` : undefined;
+  // 预留宽高比：已知尺寸用真实比例；未知尺寸（含没有宽高元数据的旧文/行内图）
+  // 一律退化为 16:9 占位，避免图片加载完成才撑开高度、把下方正在阅读的内容
+  // 突然挤下去（CLS 抖动）。图片真正加载后会用自然尺寸再修正一次，未知尺寸
+  // 图片也只有一次极小的二次微调。
+  const knownRatio = width && height ? `${width} / ${height}` : undefined;
+  const effectiveAspectRatio = naturalRatio || knownRatio || "16 / 9";
 
   useEffect(() => {
     if (!blurhash || !canvasRef.current) {
@@ -181,7 +187,25 @@ function MarkdownImage({
       el,
       src: cleanSrc,
       priority: 0,
-      load: () => setActualSrc(cleanSrc),
+      load: () => {
+        // 有宽高元数据：直接加载，比例已由 knownRatio 预留，零跳动。
+        if (knownRatio) {
+          setActualSrc(cleanSrc);
+          return;
+        }
+        // 没有宽高元数据：先用一次探测拿到真实比例并预留空间，
+        // 再加载真实像素（同源 URL 已缓存，几乎瞬时淡入），
+        // 避免「先按 16:9 占位、加载瞬间撑开成真实比例/尺寸」的跳动。
+        const probe = new Image();
+        probe.onload = () => {
+          if (probe.naturalWidth && probe.naturalHeight) {
+            setNaturalRatio(`${probe.naturalWidth} / ${probe.naturalHeight}`);
+          }
+          setActualSrc(cleanSrc);
+        };
+        probe.onerror = () => setActualSrc(cleanSrc);
+        probe.src = cleanSrc;
+      },
     };
     imageEntries.set(el, item);
     const obs = getImageObserver();
@@ -200,6 +224,10 @@ function MarkdownImage({
   }, [cleanSrc]);
 
   const handleLoad = () => {
+    const el = imageRef.current;
+    if (el && el.naturalWidth && el.naturalHeight) {
+      setNaturalRatio(`${el.naturalWidth} / ${el.naturalHeight}`);
+    }
     onLoad();
     releaseImageSlot(imageRef.current);
   };
@@ -208,16 +236,26 @@ function MarkdownImage({
     releaseImageSlot(imageRef.current);
   };
 
+  const showPlaceholder = !loaded && !failed;
+
   return (
     <span
-      className={`relative inline-block max-w-full overflow-hidden ${roundedClass}`}
-      style={{ zoom: scale, aspectRatio }}
+      className={`relative inline-block max-w-full overflow-hidden ${roundedClass} ${
+        showPlaceholder ? "bg-w dark:bg-neutral-800" : ""
+      }`}
+      style={{ zoom: scale, aspectRatio: effectiveAspectRatio }}
     >
-      {blurhash && !loaded ? (
+      {showPlaceholder && blurhash ? (
         <canvas
           ref={canvasRef}
           aria-hidden="true"
           className={`absolute inset-0 h-full w-full scale-110 blur-sm ${roundedClass}`}
+        />
+      ) : null}
+      {showPlaceholder && !blurhash ? (
+        <span
+          aria-hidden="true"
+          className={`absolute inset-0 block animate-pulse bg-gradient-to-br from-black/5 to-black/10 dark:from-white/5 dark:to-white/10 ${roundedClass}`}
         />
       ) : null}
       <img
@@ -232,11 +270,63 @@ function MarkdownImage({
         }}
         onLoad={handleLoad}
         onError={handleError}
-        className={`mx-auto max-w-full cursor-zoom-in transition-opacity ${roundedClass} ${className || ""} ${
-          blurhash && (!loaded || failed) ? "opacity-0" : "opacity-100"
-        }`}
+        className={`mx-auto max-w-full cursor-zoom-in transition-opacity duration-300 ${roundedClass} ${
+          className || ""
+        } ${showPlaceholder ? "opacity-0" : "opacity-100"}`}
       />
     </span>
+  );
+}
+
+function MarkdownVideo({
+  src,
+  poster,
+}: {
+  src?: string;
+  poster?: string;
+}) {
+  // 视频地址可能带 #t=0.1 媒体片段（桌面浏览器用它预览首帧），需原样保留给 <video>；
+  // 仅用 parseImageUrlMetadata 解析 poster 里的尺寸/blurhash，用于预留空间与占位。
+  const posterMeta = poster ? parseImageUrlMetadata(poster) : undefined;
+  const posterSrc = posterMeta?.src;
+  // 预留宽高比：有 poster 尺寸用 poster 比例，否则退化为 16:9，确保视频加载前
+  // 就占住高度，不会在元数据/首帧就绪时把下方内容突然挤下去。
+  const ratio =
+    posterMeta?.width && posterMeta?.height
+      ? `${posterMeta.width} / ${posterMeta.height}`
+      : "16 / 9";
+  const [posterReady, setPosterReady] = useState(false);
+
+  return (
+    <div
+      className="relative my-4 w-full overflow-hidden rounded-xl bg-w dark:bg-neutral-800"
+      style={{ aspectRatio: ratio }}
+    >
+      {posterSrc ? (
+        <img
+          src={posterSrc}
+          alt=""
+          aria-hidden="true"
+          onLoad={() => setPosterReady(true)}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+            posterReady ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ) : (
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 block animate-pulse bg-gradient-to-br from-black/5 to-black/10 dark:from-white/5 dark:to-white/10"
+        />
+      )}
+      <video
+        src={src}
+        poster={posterSrc}
+        controls
+        preload="metadata"
+        playsInline
+        className="absolute inset-0 h-full w-full bg-black object-contain"
+      />
+    </div>
   );
 }
 
@@ -298,6 +388,9 @@ export function Markdown({ content }: { content: string }) {
               </span>
             );
           }
+        },
+        video({ src, poster }) {
+          return <MarkdownVideo src={src} poster={poster} />;
         },
         code(props) {
           const [copied, setCopied] = React.useState(false);
