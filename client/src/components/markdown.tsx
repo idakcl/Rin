@@ -26,12 +26,17 @@ import { useImageLoadState } from "../utils/use-image-load-state";
 
 // ---------------------------------------------------------------------------
 // 文章图片并发加载控制器
-// 用 IntersectionObserver 决定「何时加载」，用计数器 + 队列把「同时在飞」的图片
-// 限制在 MAX_CONCURRENT_IMAGES 张以内，并按距视口远近排序（近的优先），避免长图
-// 文章一次性发起几十个请求导致后面的图被并发「饿死」停在模糊占位。
+// 用 IntersectionObserver 决定「可见即加载」，并用「视口中心上下各 PRELOAD_* 张」
+// 的滚动预取窗口提前发起加载，把「同时在飞」的图片限制在 MAX_CONCURRENT_IMAGES
+// 张以内（按距视口中心远近排序，近的优先），避免长图文章一次性发起几十个请求
+// 导致后面的图被并发「饿死」停在模糊占位。
 // 控制器为模块级单例，整篇文章（乃至整页）共享同一组并发槽。
 // ---------------------------------------------------------------------------
-const MAX_CONCURRENT_IMAGES = 5;
+const MAX_CONCURRENT_IMAGES = 12;
+// 以当前浏览位置（视口中心）为基准，上下各预下载的图片张数。
+// 只激活窗口内的图片去加载，不激活整篇文章几十张，避免并发洪泛。
+const PRELOAD_AHEAD = 12;
+const PRELOAD_BEHIND = 12;
 
 type ImageLoadEntry = {
   el: HTMLImageElement;
@@ -65,7 +70,56 @@ function getImageObserver(): IntersectionObserver | null {
     },
     { rootMargin: "200px" }
   );
+  ensurePreloadListeners();
   return imageObserver;
+}
+
+// ---------------------------------------------------------------------------
+// 以「当前浏览位置（视口中心）」为基准的预下载调度
+// 取视口中心上下各 PRELOAD_* 张未加载的图片，提前发起加载（受并发上限约束），
+// 让用户在滚到之前图片就已就绪，避免边滚边等。
+// ---------------------------------------------------------------------------
+let preloadListenersAttached = false;
+let preloadRafPending = false;
+
+function schedulePreload() {
+  if (typeof window === "undefined") return;
+  const vh = window.innerHeight || 0;
+  const center = vh / 2;
+  type Cand = { item: ImageLoadEntry; dist: number; above: boolean };
+  const above: Cand[] = [];
+  const below: Cand[] = [];
+  for (const item of imageEntries.values()) {
+    if (item.el.dataset.loadState === "done") continue;
+    const rect = item.el.getBoundingClientRect();
+    const elCenter = rect.top + rect.height / 2;
+    (elCenter < center ? above : below).push({
+      item,
+      dist: Math.abs(elCenter - center),
+      above: elCenter < center,
+    });
+  }
+  above.sort((a, b) => a.dist - b.dist);
+  below.sort((a, b) => a.dist - b.dist);
+  for (const c of above.slice(0, PRELOAD_BEHIND).concat(below.slice(0, PRELOAD_AHEAD))) {
+    requestImageLoad(c.item);
+  }
+}
+
+function schedulePreloadThrottled() {
+  if (preloadRafPending) return;
+  preloadRafPending = true;
+  requestAnimationFrame(() => {
+    preloadRafPending = false;
+    schedulePreload();
+  });
+}
+
+function ensurePreloadListeners() {
+  if (preloadListenersAttached || typeof window === "undefined") return;
+  preloadListenersAttached = true;
+  window.addEventListener("scroll", schedulePreloadThrottled, { passive: true });
+  window.addEventListener("resize", schedulePreloadThrottled, { passive: true });
 }
 
 function requestImageLoad(item: ImageLoadEntry) {
@@ -97,6 +151,7 @@ function releaseImageSlot(el: HTMLElement | null) {
   item.el.dataset.loadState = "done"; // 已完成，避免滚回视口时重复请求导致并发槽泄漏
   imageLoadingCount--;
   drainImageQueue();
+  schedulePreloadThrottled(); // 腾出槽位后，继续预取窗口内的下一批图片
 }
 
 function drainImageQueue() {
@@ -210,6 +265,7 @@ function MarkdownImage({
     imageEntries.set(el, item);
     const obs = getImageObserver();
     obs?.observe(el);
+    schedulePreloadThrottled(); // 注册后立刻评估预取窗口，首屏附近图片提前加载
     return () => {
       obs?.unobserve(el);
       imageEntries.delete(el);
