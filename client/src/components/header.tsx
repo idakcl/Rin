@@ -63,8 +63,8 @@ export function Header({ children }: { children?: React.ReactNode }) {
   const headerPaddingClassName = headerLayout === "compact" ? "mx-0 mt-0" : "mx-4 mt-4";
   const containerClassName =
     !useTopHeader || headerBehavior === "static"
-      ? "relative z-40"
-      : `fixed inset-x-0 top-0 z-40 transition-transform duration-300 ${
+      ? "relative z-40 pt-[env(safe-area-inset-top)]"
+      : `fixed inset-x-0 top-0 z-40 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${
           headerBehavior === "reveal" && !isRevealed ? "-translate-y-full" : "translate-y-0"
         }`;
   const spacerClassName = !useTopHeader || headerBehavior === "static" ? "h-0" : "h-20";

@@ -341,6 +341,15 @@ function MarkdownImage({
   );
 }
 
+// 微信 Android(X5)/老 iOS 兼容属性：React 类型未定义，用 as any 透传到底层 DOM。
+// x5-video-player-type="h5" 切到 H5 播放器，尊重 CSS object-fit 与 inline 布局，
+// 消除画面偏移并支持页内小窗播放；webkit-playsinline 兼容老 WebView。
+const X5_VIDEO_ATTRS = {
+  "webkit-playsinline": "true",
+  "x5-playsinline": "true",
+  "x5-video-player-type": "h5",
+} as any;
+
 function MarkdownVideo({
   src,
   poster,
@@ -417,6 +426,7 @@ function MarkdownVideo({
         controls
         preload="metadata"
         playsInline
+        {...X5_VIDEO_ATTRS}
         onLoadedMetadata={(e) => {
           const v = e.currentTarget;
           if (v.videoWidth && v.videoHeight) {

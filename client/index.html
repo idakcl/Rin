@@ -2,8 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script data-cfasync="false" src="/api/config/client/bootstrap.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- 微信/iOS 不自动把数字/电话识别成蓝色链接，避免干扰阅读 -->
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+    <!-- defer：不阻塞 HTML 解析；与下方 type=module 同为 defer，按文档顺序
+         先执行 bootstrap（注入 window.__RIN_CLIENT_CONFIG__）再挂载 React，配置不丢失 -->
+    <script data-cfasync="false" src="/api/config/client/bootstrap.js" defer></script>
   </head>
   <body>
     <div id="root"></div>

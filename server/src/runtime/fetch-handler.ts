@@ -155,14 +155,26 @@ async function getArticleOg(request: Request, env: Env, id: string): Promise<OgD
       data?.summary && String(data.summary).length > 0
         ? String(data.summary)
         : stripMarkdown(content);
-    const description = summaryRaw.replace(/\s+/g, " ").trim().slice(0, 200);
-    const image = safeUrl(extractImageWithMetadata(content));
+    // 描述兜底：正文摘要为空时退回标题或纯文本正文前 N 字，保证分享卡片有描述文字。
+    const description = (
+      summaryRaw.replace(/\s+/g, " ").trim() ||
+      title ||
+      content.replace(/\s+/g, " ").trim()
+    ).slice(0, 200);
+    // og:image 剥离 #blurhash=...&width=...&height=... 片段：爬虫忽略 #，但留着不干净；
+    // 同时本端点不支持按 width 缩放，缩略图需另立后端任务，此处先保证 URL 干净。
+    const rawImage = extractImageWithMetadata(content);
+    const image = rawImage ? safeUrl(rawImage.split("#")[0]) : undefined;
+    // 站点名取自 Worker env vars（与站点卡片一致）
+    const ev = env as unknown as Record<string, any>;
+    const siteName = typeof ev?.NAME === "string" ? ev.NAME : "";
     return {
       type: "article",
       title: escapeHtmlAttr(title),
       description: escapeHtmlAttr(description),
       image: image ? escapeHtmlAttr(image) : undefined,
       url: escapeHtmlAttr(new URL(request.url).toString()),
+      siteName: escapeHtmlAttr(siteName),
       twitterCard: "summary_large_image",
     };
   } catch {
@@ -193,6 +205,7 @@ async function getSiteOg(request: Request, env: Env): Promise<OgData> {
     description: escapeHtmlAttr(description),
     image: image ? escapeHtmlAttr(image) : undefined,
     url: escapeHtmlAttr(new URL(request.url).toString()),
+    siteName: escapeHtmlAttr(name),
     twitterCard: "summary_large_image",
   };
 }
