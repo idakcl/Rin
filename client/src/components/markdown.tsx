@@ -1,5 +1,5 @@
 import "katex/dist/katex.min.css";
-import React, { cloneElement, isValidElement, useEffect, useMemo, useRef } from "react";
+import React, { cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { AudioPlayer } from "./audio-player";
@@ -23,6 +23,92 @@ import { drawBlurhashToCanvas } from "../utils/blurhash";
 import { useColorMode } from "../utils/darkModeUtils";
 import { parseImageUrlMetadata } from "../utils/image-upload";
 import { useImageLoadState } from "../utils/use-image-load-state";
+
+// ---------------------------------------------------------------------------
+// 文章图片并发加载控制器
+// 用 IntersectionObserver 决定「何时加载」，用计数器 + 队列把「同时在飞」的图片
+// 限制在 MAX_CONCURRENT_IMAGES 张以内，并按距视口远近排序（近的优先），避免长图
+// 文章一次性发起几十个请求导致后面的图被并发「饿死」停在模糊占位。
+// 控制器为模块级单例，整篇文章（乃至整页）共享同一组并发槽。
+// ---------------------------------------------------------------------------
+const MAX_CONCURRENT_IMAGES = 5;
+
+type ImageLoadEntry = {
+  el: HTMLImageElement;
+  src: string;
+  priority: number; // 距视口垂直距离，越小越优先
+  load: () => void; // 通知 React 给 <img> 设置真实 src
+};
+
+let imageLoadingCount = 0;
+const imageEntries = new Map<HTMLElement, ImageLoadEntry>();
+let imageQueue: ImageLoadEntry[] = [];
+let imageObserver: IntersectionObserver | null = null;
+
+function getImageObserver(): IntersectionObserver | null {
+  if (typeof IntersectionObserver === "undefined") {
+    return null;
+  }
+  if (imageObserver) {
+    return imageObserver;
+  }
+  imageObserver = new IntersectionObserver(
+    (obsEntries) => {
+      for (const entry of obsEntries) {
+        const el = entry.target as HTMLImageElement;
+        const item = imageEntries.get(el);
+        // 进入视口(提前 200px)且尚未排队/加载，才请求
+        if (entry.isIntersecting && item && !el.dataset.loadState) {
+          requestImageLoad(item);
+        }
+      }
+    },
+    { rootMargin: "200px" }
+  );
+  return imageObserver;
+}
+
+function requestImageLoad(item: ImageLoadEntry) {
+  if (item.el.dataset.loadState) {
+    return; // 已在排队/加载，防重
+  }
+  item.priority = Math.abs(item.el.getBoundingClientRect().top);
+  if (imageLoadingCount >= MAX_CONCURRENT_IMAGES) {
+    item.el.dataset.loadState = "queued";
+    imageQueue.push(item);
+    imageQueue.sort((a, b) => a.priority - b.priority); // 离视口近的优先
+  } else {
+    startImageLoad(item);
+  }
+}
+
+function startImageLoad(item: ImageLoadEntry) {
+  imageLoadingCount++;
+  item.el.dataset.loadState = "loading";
+  item.load(); // 触发 React 设置真实 src，浏览器开始拉取
+}
+
+function releaseImageSlot(el: HTMLElement | null) {
+  if (!el) return;
+  const item = imageEntries.get(el);
+  if (!item || item.el.dataset.loadState !== "loading") {
+    return;
+  }
+  item.el.dataset.loadState = "done"; // 已完成，避免滚回视口时重复请求导致并发槽泄漏
+  imageLoadingCount--;
+  drainImageQueue();
+}
+
+function drainImageQueue() {
+  while (imageLoadingCount < MAX_CONCURRENT_IMAGES && imageQueue.length > 0) {
+    const next = imageQueue.shift()!;
+    if (next.el.isConnected) {
+      startImageLoad(next);
+    } else {
+      imageEntries.delete(next.el); // 元素已卸载，丢弃
+    }
+  }
+}
 
 
 const countNewlinesBeforeNode = (text: string, offset: number) => {
@@ -68,7 +154,8 @@ function MarkdownImage({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { src: cleanSrc, blurhash, width, height } = parseImageUrlMetadata(src);
-  const { failed, imageRef, loaded, onError, onLoad } = useImageLoadState(cleanSrc);
+  const [actualSrc, setActualSrc] = useState<string | undefined>(undefined);
+  const { failed, imageRef, loaded, onError, onLoad } = useImageLoadState(actualSrc);
   const roundedClass = rounded ? "rounded-xl" : "";
   const aspectRatio = width && height ? `${width} / ${height}` : undefined;
 
@@ -82,6 +169,44 @@ function MarkdownImage({
       console.error("Failed to render blurhash", error);
     }
   }, [blurhash]);
+
+  // 注册到并发加载控制器：进入视口(提前 200px)才排队/加载，全局最多 5 张同时在飞。
+  // 延迟设置真实 src，避免长图文章一次性发起几十个请求把后面的图「饿死」。
+  useEffect(() => {
+    const el = imageRef.current;
+    if (!el || !cleanSrc) {
+      return;
+    }
+    const item: ImageLoadEntry = {
+      el,
+      src: cleanSrc,
+      priority: 0,
+      load: () => setActualSrc(cleanSrc),
+    };
+    imageEntries.set(el, item);
+    const obs = getImageObserver();
+    obs?.observe(el);
+    return () => {
+      obs?.unobserve(el);
+      imageEntries.delete(el);
+      imageQueue = imageQueue.filter((q) => q.el !== el);
+      if (el.dataset.loadState === "loading") {
+        imageLoadingCount--;
+        drainImageQueue();
+      }
+      el.dataset.loadState = "";
+      setActualSrc(undefined);
+    };
+  }, [cleanSrc]);
+
+  const handleLoad = () => {
+    onLoad();
+    releaseImageSlot(imageRef.current);
+  };
+  const handleError = () => {
+    onError();
+    releaseImageSlot(imageRef.current);
+  };
 
   return (
     <span
@@ -97,15 +222,16 @@ function MarkdownImage({
       ) : null}
       <img
         ref={imageRef}
-        src={cleanSrc}
+        src={actualSrc}
         alt={alt}
         width={width}
         height={height}
+        decoding="async"
         onClick={() => {
           show(cleanSrc);
         }}
-        onLoad={onLoad}
-        onError={onError}
+        onLoad={handleLoad}
+        onError={handleError}
         className={`mx-auto max-w-full cursor-zoom-in transition-opacity ${roundedClass} ${className || ""} ${
           blurhash && (!loaded || failed) ? "opacity-0" : "opacity-100"
         }`}
