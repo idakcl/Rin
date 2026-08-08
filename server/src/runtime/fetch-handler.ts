@@ -125,8 +125,9 @@ async function injectOgIntoHtml(indexResponse: Response, og: OgData): Promise<Re
   const newHtml = html.replace("</head>", `    ${metas}\n</head>`);
   const headers = new Headers(indexResponse.headers);
   headers.set("Content-Type", "text/html; charset=utf-8");
-  // OG 内容随文章/页面变化，不能 immutable 长缓存；短缓存即可(CDN 按 URL 区分)
-  headers.set("Cache-Control", "public, max-age=300");
+  // 分享卡片需服务端动态注入，且随文章/站点配置变化；若被边缘缓存，爬虫会拿到陈旧卡片。
+  // no-store 让每次请求都进 Worker 重新注入，保证分享卡片永远最新(OG 爬虫请求量很小，无压力)。
+  headers.set("Cache-Control", "no-store");
   return new Response(newHtml, {
     status: indexResponse.status,
     statusText: indexResponse.statusText,
@@ -239,7 +240,15 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     if (og) {
       return injectOgIntoHtml(indexResponse, og);
     }
-    return indexResponse;
+    // 兜底：即便取不到 OG 数据，也不要透传 ASSETS 的 immutable 长缓存，
+    // 否则首页 HTML 会被边缘永久缓存、Worker 再也无法接管注入。
+    const fallbackHeaders = new Headers(indexResponse.headers);
+    fallbackHeaders.set("Cache-Control", "no-store");
+    return new Response(indexResponse.body, {
+      status: indexResponse.status,
+      statusText: indexResponse.statusText,
+      headers: fallbackHeaders,
+    });
   }
 
   return new Response("Hi", { status: 200 });
