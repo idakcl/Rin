@@ -345,17 +345,34 @@ function MarkdownVideo({
   // 仅用 parseImageUrlMetadata 解析 poster 里的尺寸/blurhash，用于预留空间与占位。
   const posterMeta = poster ? parseImageUrlMetadata(poster) : undefined;
   const posterSrc = posterMeta?.src;
-  // 渐进式还原视频原始尺寸，避免强制 16:9 容器让竖屏视频出现左右黑边：
-  // 1) 初次渲染：按 poster 比例(或 16:9)占位，预留高度避免 loadedmetadata 前的 CLS；
-  // 2) onLoadedMetadata 后：用 videoWidth/videoHeight 探测真实比例替换容器，
-  //    此时 <video object-contain> 恰好铺满容器、无黑边。
+  // 渐进式还原视频原始比例，消除强制 16:9 带来的黑边（竖屏/横屏皆然）：
+  // - initialRatio：poster 内嵌宽高(或 16:9) 作为首屏占位，预留高度避免 CLS；
+  // - posterRatio：poster 图片 onLoad 后按其自然尺寸设定。微信内置浏览器对
+  //   <video preload="metadata"> 不会自动拉取元数据（onLoadedMetadata 不触发），
+  //   但普通 <img> 正常加载，因此这里能拿到≈视频真实比例，黑边即时消失；
+  // - videoRatio：<video> loadedmetadata 后以视频真实宽高为准，最权威。
+  // 同时容器与 poster 都用 object-contain，保证画面（尤其顶部）始终完整不被裁切。
   const initialRatio =
     posterMeta?.width && posterMeta?.height
       ? `${posterMeta.width} / ${posterMeta.height}`
       : "16 / 9";
+  const [posterRatio, setPosterRatio] = useState<string | null>(null);
   const [videoRatio, setVideoRatio] = useState<string | null>(null);
-  const ratio = videoRatio ?? initialRatio;
+  const ratio = videoRatio ?? posterRatio ?? initialRatio;
   const [posterReady, setPosterReady] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // 主动触发元数据加载：部分浏览器/微信对 preload="metadata" 不自动拉取，
+  // 用 load() 强制按 metadata 预载，loadedmetadata 后即可拿到真实比例兜底修正。
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    try {
+      v.load();
+    } catch {
+      /* 忽略不支持的调用 */
+    }
+  }, [src]);
 
   return (
     <div
@@ -367,8 +384,14 @@ function MarkdownVideo({
           src={posterSrc}
           alt=""
           aria-hidden="true"
-          onLoad={() => setPosterReady(true)}
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+          onLoad={(e) => {
+            const img = e.currentTarget;
+            if (img.naturalWidth && img.naturalHeight) {
+              setPosterRatio(`${img.naturalWidth} / ${img.naturalHeight}`);
+            }
+            setPosterReady(true);
+          }}
+          className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-300 ${
             videoRatio ? "opacity-0" : posterReady ? "opacity-100" : "opacity-0"
           }`}
         />
@@ -379,6 +402,7 @@ function MarkdownVideo({
         />
       ) : null}
       <video
+        ref={videoRef}
         src={src}
         poster={posterSrc}
         controls
