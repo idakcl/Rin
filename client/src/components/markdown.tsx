@@ -266,6 +266,13 @@ function MarkdownImage({
     const obs = getImageObserver();
     obs?.observe(el);
     schedulePreloadThrottled(); // 注册后立刻评估预取窗口，首屏附近图片提前加载
+    // 同步检查：图片已在视口内（含 rootMargin 200px）则立即加载，不等观察器异步回调。
+    // 避免 IntersectionObserver 偶发未触发导致首图不加载（需上下滑动才出现）。
+    const rect = el.getBoundingClientRect();
+    const vh = window.innerHeight || 0;
+    if (rect.top < vh + 200 && rect.bottom > -200) {
+      requestImageLoad(item);
+    }
     return () => {
       obs?.unobserve(el);
       imageEntries.delete(el);
@@ -391,20 +398,21 @@ function MarkdownVideo({
             }
             setPosterReady(true);
           }}
-          className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-300 ${
+          className={`absolute inset-0 h-full w-full object-contain rounded-xl transition-opacity duration-300 ${
             videoRatio ? "opacity-0" : posterReady ? "opacity-100" : "opacity-0"
           }`}
         />
       ) : !videoRatio ? (
         <span
           aria-hidden="true"
-          className="absolute inset-0 block animate-pulse bg-gradient-to-br from-black/5 to-black/10 dark:from-white/5 dark:to-white/10"
+          className="absolute inset-0 block animate-pulse rounded-xl bg-gradient-to-br from-black/5 to-black/10 dark:from-white/5 dark:to-white/10"
         />
       ) : null}
+      {/* 视频元素：元数据加载前 opacity-0（避免与 poster 覆盖层双重渲染导致顶部小边），
+          加载后淡入并由自身的 rounded-xl 配合父容器 overflow-hidden 保证四角圆角一致。 */}
       <video
         ref={videoRef}
         src={src}
-        poster={posterSrc}
         controls
         preload="metadata"
         playsInline
@@ -414,7 +422,9 @@ function MarkdownVideo({
             setVideoRatio(`${v.videoWidth} / ${v.videoHeight}`);
           }
         }}
-        className="absolute inset-0 h-full w-full bg-black object-contain"
+        className={`absolute inset-0 h-full w-full bg-black object-contain rounded-xl transition-opacity duration-300 ${
+          videoRatio ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
       />
     </div>
   );
