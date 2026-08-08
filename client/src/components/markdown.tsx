@@ -366,7 +366,6 @@ function MarkdownVideo({
   const [posterRatio, setPosterRatio] = useState<string | null>(null);
   const [videoRatio, setVideoRatio] = useState<string | null>(null);
   const ratio = videoRatio ?? posterRatio ?? initialRatio;
-  const [posterReady, setPosterReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // 主动触发元数据加载：部分浏览器/微信对 preload="metadata" 不自动拉取，
@@ -381,11 +380,19 @@ function MarkdownVideo({
     }
   }, [src]);
 
+  // 比例已知（poster 自然尺寸已加载，或视频元数据已就绪）时用 object-fill：
+  // 此时容器比例已等于视频真实比例，fill 不拉伸变形，且能避开 Android WebView 对
+  // object-contain 的垂直偏移渲染 bug（表现为画面偏下、顶部留一条缝）。
+  // 比例未知（仅 16:9 占位）时退化为 object-contain，避免短暂拉伸变形。
+  const objectFit = videoRatio || posterRatio ? "object-fill" : "object-contain";
+
   return (
     <div
       className="relative my-4 w-full overflow-hidden rounded-xl bg-w dark:bg-neutral-800"
       style={{ aspectRatio: ratio }}
     >
+      {/* 隐藏的 poster <img>：仅用于读取自然尺寸设定容器比例（消除黑边/CLS），
+          微信内 <img> 正常加载；不可见、不拦截点击，video 自身始终承担显示与交互。 */}
       {posterSrc ? (
         <img
           src={posterSrc}
@@ -396,20 +403,13 @@ function MarkdownVideo({
             if (img.naturalWidth && img.naturalHeight) {
               setPosterRatio(`${img.naturalWidth} / ${img.naturalHeight}`);
             }
-            setPosterReady(true);
           }}
-          className={`absolute inset-0 h-full w-full object-contain rounded-xl transition-opacity duration-300 ${
-            videoRatio ? "opacity-0" : posterReady ? "opacity-100" : "opacity-0"
-          }`}
-        />
-      ) : !videoRatio ? (
-        <span
-          aria-hidden="true"
-          className="absolute inset-0 block animate-pulse rounded-xl bg-gradient-to-br from-black/5 to-black/10 dark:from-white/5 dark:to-white/10"
+          className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
         />
       ) : null}
-      {/* 视频元素：元数据加载前 opacity-0（避免与 poster 覆盖层双重渲染导致顶部小边），
-          加载后淡入并由自身的 rounded-xl 配合父容器 overflow-hidden 保证四角圆角一致。 */}
+      {/* video 始终可见可交互：controls 常驻显示播放按钮（微信内元数据不加载时
+          也不会因 opacity:0 而丢失按钮）；自身 rounded-xl + 父容器 overflow-hidden
+          保证四角圆角一致。 */}
       <video
         ref={videoRef}
         src={src}
@@ -423,9 +423,7 @@ function MarkdownVideo({
             setVideoRatio(`${v.videoWidth} / ${v.videoHeight}`);
           }
         }}
-        className={`absolute inset-0 h-full w-full bg-black object-contain rounded-xl transition-opacity duration-300 ${
-          videoRatio ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
+        className={`absolute inset-0 h-full w-full bg-black ${objectFit} rounded-xl`}
       />
     </div>
   );
