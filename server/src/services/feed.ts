@@ -248,7 +248,10 @@ export function FeedService(): Hono<{
         const hashtags_flatten = hashtags.map((f: any) => f.hashtag);
 
         // update visits using HyperLogLog for efficient UV estimation
-        const enableVisit = await profileAsync(c, 'feed_detail_counter_flag', () => clientConfig.getOrDefault('counter.enabled', true));
+        // OG 卡片注入时的内部请求带 x-og-preview 头，此时不计入访问量，避免
+        // 与普通客户端拉取重复计数（文章页 PV 翻倍）
+        const isOgPreview = c.req.header('x-og-preview') === '1';
+        const enableVisit = !isOgPreview && await profileAsync(c, 'feed_detail_counter_flag', () => clientConfig.getOrDefault('counter.enabled', true));
         let pv = 0;
         let uv = 0;
 

@@ -1,4 +1,6 @@
 import { getApp } from "./app-instance";
+import { extractImageWithMetadata } from "../utils/image";
+import { stripMarkdown } from "../utils/markdown";
 
 const ROOT_FEED_PATTERN = /^\/(rss\.xml|atom\.xml|rss\.json|feed\.json|feed\.xml)$/;
 const APP_PUBLIC_ROUTE_PATTERN = /^\/(favicon|favicon\.ico)(?:\/|$)/;
@@ -65,6 +67,139 @@ async function serveSpaEntry(request: Request, env: Env) {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// 分享卡片(Open Graph / Twitter Card)服务端注入
+// 社交爬虫基本不执行 JS，纯 SPA 空壳 HTML 显示不出预览卡片，因此必须在服务端
+// 按 URL 把 og:/twitter: 元标签注入到 <head>，再返回。
+// ---------------------------------------------------------------------------
+type OgData = {
+  type: string;
+  title?: string;
+  description?: string;
+  image?: string;
+  url?: string;
+  siteName?: string;
+  twitterCard: string;
+};
+
+// 转义 HTML 属性值，防止文章字段破坏标签或注入脚本
+function escapeHtmlAttr(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// 仅允许 http/https 的 URL 进入属性，避免 javascript:/data: 等危险协议
+function safeUrl(u: string | undefined): string | undefined {
+  if (!u) return undefined;
+  try {
+    const url = new URL(u);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function buildOgMetaTags(og: OgData): string {
+  const tags: string[] = [`<meta property="og:type" content="${og.type}">`];
+  if (og.title) tags.push(`<meta property="og:title" content="${og.title}">`);
+  if (og.description) tags.push(`<meta property="og:description" content="${og.description}">`);
+  if (og.image) tags.push(`<meta property="og:image" content="${og.image}">`);
+  if (og.url) tags.push(`<meta property="og:url" content="${og.url}">`);
+  if (og.siteName) tags.push(`<meta property="og:site_name" content="${og.siteName}">`);
+  // Twitter Card：大图预览(summary_large_image)，微信/Telegram/X/Discord 通用
+  tags.push(`<meta name="twitter:card" content="${og.twitterCard}">`);
+  if (og.title) tags.push(`<meta name="twitter:title" content="${og.title}">`);
+  if (og.description) tags.push(`<meta name="twitter:description" content="${og.description}">`);
+  if (og.image) tags.push(`<meta name="twitter:image" content="${og.image}">`);
+  return tags.join("\n    ");
+}
+
+async function injectOgIntoHtml(indexResponse: Response, og: OgData): Promise<Response> {
+  const html = await indexResponse.text();
+  const metas = buildOgMetaTags(og);
+  const newHtml = html.replace("</head>", `    ${metas}\n</head>`);
+  const headers = new Headers(indexResponse.headers);
+  headers.set("Content-Type", "text/html; charset=utf-8");
+  // OG 内容随文章/页面变化，不能 immutable 长缓存；短缓存即可(CDN 按 URL 区分)
+  headers.set("Cache-Control", "public, max-age=300");
+  return new Response(newHtml, {
+    status: indexResponse.status,
+    statusText: indexResponse.statusText,
+    headers,
+  });
+}
+
+// 文章页卡片：标题 + 正文摘要 + 第一张图
+async function getArticleOg(request: Request, env: Env, id: string): Promise<OgData | null> {
+  try {
+    const origin = new URL(request.url).origin;
+    // getApp().fetch 走 Hono 路由(不经 handleFetch 的 /api 重写)，故用已重写路径 /feed/<id>
+    const ogHeaders = new Headers(request.headers);
+    ogHeaders.set("x-og-preview", "1"); // 告诉 FeedService 跳过访问计数
+    const apiReq = new Request(new URL(`/feed/${encodeURIComponent(id)}`, origin), {
+      method: request.method,
+      headers: ogHeaders,
+    });
+    const res = await getApp().fetch(apiReq, env);
+    if (!res.ok) return null;
+    const data = (await res.json()) as any;
+    const title = typeof data?.title === "string" ? data.title : "";
+    const content = typeof data?.content === "string" ? data.content : "";
+    const summaryRaw =
+      data?.summary && String(data.summary).length > 0
+        ? String(data.summary)
+        : stripMarkdown(content);
+    const description = summaryRaw.replace(/\s+/g, " ").trim().slice(0, 200);
+    const image = safeUrl(extractImageWithMetadata(content));
+    return {
+      type: "article",
+      title: escapeHtmlAttr(title),
+      description: escapeHtmlAttr(description),
+      image: image ? escapeHtmlAttr(image) : undefined,
+      url: escapeHtmlAttr(new URL(request.url).toString()),
+      twitterCard: "summary_large_image",
+    };
+  } catch {
+    return null;
+  }
+}
+
+// 站点级卡片(首页/标签页/关于等非文章页)：用站点配置
+async function getSiteOg(request: Request, env: Env): Promise<OgData> {
+  let name = "";
+  let description = "";
+  let avatar = "";
+  try {
+    const origin = new URL(request.url).origin;
+    // 同上：用已重写路径 /config(不经 /api 重写)
+    const cfgReq = new Request(new URL("/config", origin), request);
+    const res = await getApp().fetch(cfgReq, env);
+    if (res.ok) {
+      const data = (await res.json()) as any;
+      const site = data?.site ?? {};
+      name = site.name ?? data?.["site.name"] ?? "";
+      description = site.description ?? data?.["site.description"] ?? "";
+      avatar = site.avatar ?? data?.["site.avatar"] ?? "";
+    }
+  } catch {
+    /* 取不到就用空值，文章卡片不受影响 */
+  }
+  const image = safeUrl(avatar);
+  return {
+    type: "website",
+    title: escapeHtmlAttr(name),
+    description: escapeHtmlAttr(description),
+    image: image ? escapeHtmlAttr(image) : undefined,
+    url: escapeHtmlAttr(new URL(request.url).toString()),
+    twitterCard: "summary_large_image",
+  };
+}
+
 export async function handleFetch(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const pathname = url.pathname;
@@ -90,6 +225,20 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
 
   const indexResponse = await serveSpaEntry(request, env);
   if (indexResponse) {
+    // 注入分享卡片元标签：爬虫不执行 JS，必须在服务端 HTML 的 <head> 写入 og:/twitter:。
+    // 文章页取文章数据做文章级卡片；其余页回退到站点级卡片。
+    const url = new URL(request.url);
+    const feedMatch = url.pathname.match(/^\/feed\/([^/]+)\/?$/);
+    let og: OgData | null = null;
+    if (feedMatch && feedMatch[1]) {
+      og = await getArticleOg(request, env, feedMatch[1]);
+    }
+    if (!og) {
+      og = await getSiteOg(request, env);
+    }
+    if (og) {
+      return injectOgIntoHtml(indexResponse, og);
+    }
     return indexResponse;
   }
 
