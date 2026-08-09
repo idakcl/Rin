@@ -1,6 +1,7 @@
 import { client } from "../app/runtime";
 import { encodeBlurhash } from "./blurhash";
 import { uploadToStorageWithProgress, uploadToNetpanWithProgress } from "./upload-with-progress";
+import { compressImageFile } from "./image-compress";
 
 export const DEFAULT_IMAGE_MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -314,7 +315,11 @@ export async function uploadImageFile(
   signal?: AbortSignal,
 ): Promise<UploadedImageResult> {
   const [uploadResult, metadataResult] = await Promise.allSettled([
-    uploadToStorageWithProgress(file, file.name, onProgress, signal),
+    // 上传前先压缩（受全局开关控制；非图片/关开关时原样返回）。
+    // 元数据仍用原图算，保证占位尺寸与宽高比正确。
+    compressImageFile(file).then((compressed) =>
+      uploadToStorageWithProgress(compressed, compressed.name, onProgress, signal),
+    ),
     generateImageMetadata(file),
   ]);
 
@@ -352,7 +357,9 @@ export async function uploadFileToNetpan(
   onProgress?: (pct: number) => void,
   signal?: AbortSignal,
 ): Promise<string> {
-  return uploadToNetpanWithProgress(file, onProgress, signal);
+  // 图片在上传前压缩（受全局开关控制；非图片原样返回）。
+  const toUpload = await compressImageFile(file);
+  return uploadToNetpanWithProgress(toUpload, onProgress, signal);
 }
 
 // ---------------------------------------------------------------------------

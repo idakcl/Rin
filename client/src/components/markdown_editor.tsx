@@ -8,6 +8,8 @@ import { useAlert } from "./dialog";
 import { useColorMode } from "../utils/darkModeUtils";
 import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE, DEFAULT_VIDEO_MAX_FILE_SIZE, isVideoFile, buildMarkdownVideo, uploadVideoToNetpan, isAudioFile, uploadFileToNetpan, buildMarkdownAudio, buildMarkdownFile, attachVideoPoster } from "../utils/image-upload";
 import { NETPAN_MAX_FILE_SIZE } from "../netpan";
+import { isImageCompressEnabled, setImageCompressEnabled } from "../utils/compress-pref";
+import { compressImageFile } from "../utils/image-compress";
 import { Markdown } from "./markdown";
 import { mapWithConcurrency } from "../utils/concurrency";
 import { addUpload, setUploadStatus, setUploadProgress, setUploadUrl, registerRetry, registerAbort } from "../utils/upload-progress-store";
@@ -51,11 +53,13 @@ function MarkdownToolButton({
   icon,
   onClick,
   disabled = false,
+  active = false,
 }: {
   label: string;
   icon: string;
   onClick: () => void;
   disabled?: boolean;
+  active?: boolean;
 }) {
   return (
     <button
@@ -65,7 +69,10 @@ function MarkdownToolButton({
       disabled={disabled}
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
-      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-transparent text-lg t-secondary transition-colors hover:border-black/10 hover:bg-neutral-100 hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme disabled:cursor-not-allowed disabled:opacity-50 dark:hover:border-white/10 dark:hover:bg-neutral-700 dark:hover:text-white sm:h-10 sm:w-10"
+      className={
+        "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-lg t-secondary transition-colors hover:border-black/10 hover:bg-neutral-100 hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-theme disabled:cursor-not-allowed disabled:opacity-50 dark:hover:border-white/10 dark:hover:bg-neutral-700 dark:hover:text-white sm:h-10 sm:w-10" +
+        (active ? " border-theme bg-theme/10 text-theme" : " border-transparent")
+      }
     >
       <i className={icon} aria-hidden="true" />
       <span className="sr-only">{label}</span>
@@ -80,6 +87,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
   const isComposingRef = useRef(false);
   const [preview, setPreview] = useState<'edit' | 'preview' | 'comparison'>('edit');
   const [uploading, setUploading] = useState(false);
+  const [compressOn, setCompressOn] = useState<boolean>(isImageCompressEnabled());
   const { showAlert, AlertUI } = useAlert();
 
   async function insertImage(
@@ -153,7 +161,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
   // up to CONCURRENCY_LIMIT files upload at once, the rest are queued.
   const insertMediaSequentially = async (
     files: FileList | File[],
-    validate: (file: File) => string | null,
+    validate: (file: File) => string | null | Promise<string | null>,
     produce: (file: File, onProgress: (pct: number) => void, signal: AbortSignal) => Promise<{ snippet: string; url: string }>,
     showAlert: (msg: string) => void,
   ) => {
@@ -176,7 +184,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
       i: number,
     ): Promise<string | null> => {
       const id = ids[i];
-      const error = validate(file);
+      const error = await validate(file);
       if (error) {
         setUploadStatus(id, "error", error);
         showAlert(error);
@@ -467,12 +475,16 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
       if (files.length === 0) return;
       void insertMediaSequentially(
         files,
-        (file) => {
+        async (file) => {
           // The first button is backed by Cloudflare R2: images get the
           // blurhash/metadata optimization path, videos upload raw (no
           // transcode) — both land in the same R2 bucket.
           if (isImageFile(file)) {
-            if (file.size > DEFAULT_IMAGE_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(DEFAULT_IMAGE_MAX_FILE_SIZE / 1024 / 1024) });
+            // 原图已在上限内：压缩后必然更小，直接放行，避免无谓的二次压缩。
+            if (file.size <= DEFAULT_IMAGE_MAX_FILE_SIZE) return null;
+            // 原图超限：先在浏览器内压缩，压缩后仍超才提示（绝大多数大图压完远小于上限）。
+            const compressed = await compressImageFile(file);
+            if (compressed.size > DEFAULT_IMAGE_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(DEFAULT_IMAGE_MAX_FILE_SIZE / 1024 / 1024) });
             return null;
           }
           if (isVideoFile(file)) {
@@ -765,6 +777,16 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           <UploadVideoButton />
           <UploadMusicButton />
           <UploadFileButton />
+          <MarkdownToolButton
+            label={compressOn ? "图片压缩：开" : "图片压缩：关"}
+            icon="ri-file-zip-line"
+            active={compressOn}
+            onClick={() => {
+              const next = !compressOn;
+              setCompressOn(next);
+              setImageCompressEnabled(next);
+            }}
+          />
         </div>
         {uploading &&
           <div className="flex flex-row items-center space-x-2 px-2">
@@ -783,9 +805,13 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
               if (!files || files.length === 0) return;
               void insertMediaSequentially(
                 files,
-                (file) => {
+                async (file) => {
                   if (isImageFile(file)) {
-                    if (file.size > DEFAULT_IMAGE_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(DEFAULT_IMAGE_MAX_FILE_SIZE / 1024 / 1024) });
+                    // 原图已在上限内：压缩后必然更小，直接放行，避免无谓的二次压缩。
+                    if (file.size <= DEFAULT_IMAGE_MAX_FILE_SIZE) return null;
+                    // 原图超限：先在浏览器内压缩，压缩后仍超才提示。
+                    const compressed = await compressImageFile(file);
+                    if (compressed.size > DEFAULT_IMAGE_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(DEFAULT_IMAGE_MAX_FILE_SIZE / 1024 / 1024) });
                     return null;
                   }
                   if (isVideoFile(file)) {

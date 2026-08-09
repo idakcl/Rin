@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReactLoading from "react-loading";
+import { compressImageFile } from "../utils/image-compress";
 import {
   DEFAULT_IMAGE_MAX_FILE_SIZE,
   isImageFile,
@@ -46,9 +47,14 @@ export function ImageUploadInput({
       return;
     }
 
+    // 原图已在上限内：交给 uploadImageFile 压缩后上传（压缩后必然更小），不重复压缩。
+    // 仅当原图超限时，先在浏览器内压缩判断，压缩后仍超才提示，避免误拦大图。
     if (file.size > maxFileSize) {
-      showError(t("upload.failed$size", { size: Math.round(maxFileSize / 1024 / 1024) }));
-      return;
+      const compressed = await compressImageFile(file);
+      if (compressed.size > maxFileSize) {
+        showError(t("upload.failed$size", { size: Math.round(maxFileSize / 1024 / 1024) }));
+        return;
+      }
     }
 
     const id = addUpload(file.name, file.size);
