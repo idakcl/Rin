@@ -87,7 +87,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
     range: NonNullable<ReturnType<editor.IStandaloneCodeEditor["getSelection"]>>,
     showAlert: (msg: string) => void,
   ): Promise<EditorPosition | undefined> {
-    const id = addUpload(file.name);
+    const id = addUpload(file.name, file.size);
 
     // 重传闭包：失败后在悬浮窗点「重新上传」时回调，重传到原位置。
     const retryInsert = async () => {
@@ -167,7 +167,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
     if (fileList.length === 0) return;
 
     // 先把所有文件登记为排队中，悬浮窗立即可见。
-    const ids = fileList.map((f) => addUpload(f.name));
+    const ids = fileList.map((f) => addUpload(f.name, f.size));
 
     // 上传单个文件并上报进度，返回生成的 markdown 片段（失败返回 null）。
     // 抽出来供「首次并发上传」和「失败重试」复用。

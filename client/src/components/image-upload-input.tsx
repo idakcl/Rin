@@ -51,7 +51,7 @@ export function ImageUploadInput({
       return;
     }
 
-    const id = addUpload(file.name);
+    const id = addUpload(file.name, file.size);
 
     // 重传闭包：失败后在悬浮窗点「重新上传」时回调。
     const retryAvatar = async () => {

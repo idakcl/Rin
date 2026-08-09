@@ -14,8 +14,29 @@ export interface UploadItem {
   status: UploadStatus;
   pct: number;
   error?: string;
+  // 文件字节大小，用于上传窗口里展示（上传中条目 / 已上传缩略图下方）。
+  size?: number;
   // 上传成功后的资源 URL，用于「已上传」折叠里渲染缩略图。
   url?: string;
+}
+
+// 把字节数格式化成人类可读的文件大小：512 B / 980 KB / 12.3 MB / 1.2 GB。
+// 不足 1KB 显示 B；KB/MB 取整数或 1 位小数；超大显示 GB。无值返回空串。
+export function formatBytes(bytes?: number): string {
+  if (bytes == null || bytes <= 0) return "";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  );
+  const value = bytes / Math.pow(1024, i);
+  const text =
+    i === 0
+      ? String(Math.round(value))
+      : value >= 10
+        ? String(Math.round(value))
+        : value.toFixed(1);
+  return `${text} ${units[i]}`;
 }
 
 type Listener = (items: UploadItem[]) => void;
@@ -39,9 +60,9 @@ export function subscribeUploadProgress(listener: Listener): () => void {
 
 let seq = 0;
 
-export function addUpload(name: string): string {
+export function addUpload(name: string, size?: number): string {
   const id = `up_${Date.now().toString(36)}_${(seq++).toString(36)}`;
-  items = [...items, { id, name, status: "queued", pct: 0 }];
+  items = [...items, { id, name, status: "queued", pct: 0, size }];
   emit();
   return id;
 }

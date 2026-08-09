@@ -9,6 +9,7 @@ import {
   retryCancelled,
   cancelUpload,
   clearAll,
+  formatBytes,
   type UploadItem,
 } from "../utils/upload-progress-store";
 
@@ -98,11 +99,19 @@ export function UploadProgressLayer() {
     return (
       <div key={it.id} className="flex items-center gap-2 text-xs">
         <span
-          className="w-24 shrink-0 truncate t-secondary"
+          className="w-16 shrink-0 truncate t-secondary"
           title={it.name}
         >
           {it.name}
         </span>
+        {it.size != null && (
+          <span
+            className="w-14 shrink-0 text-right tabular-nums t-secondary"
+            title={formatBytes(it.size)}
+          >
+            {formatBytes(it.size)}
+          </span>
+        )}
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
           <div
             className={`h-full rounded-full ${barColor} transition-[width] duration-200`}
@@ -141,7 +150,8 @@ export function UploadProgressLayer() {
     );
   };
 
-  // 已上传条目折叠展开后，按 url 渲染缩略图（图片 / 视频首帧）。
+  // 已上传条目折叠展开后，渲染为列表视图：左侧缩略图 + 右侧完整文件名 + 文件大小，
+  // 长文件名可换行完整显示（不再截断）。
   const renderThumb = (it: UploadItem) => {
     const kind = thumbnailKind(it.url, it.name);
     if (!kind || !it.url) return null;
@@ -152,14 +162,14 @@ export function UploadProgressLayer() {
         target="_blank"
         rel="noreferrer"
         title={it.name}
-        className="block w-16 overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.04]"
+        className="flex items-center gap-2 overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] px-2 py-1.5 dark:border-white/10 dark:bg-white/[0.04]"
       >
         {kind === "image" ? (
           <img
             src={it.url}
             alt={it.name}
             loading="lazy"
-            className="h-16 w-16 object-cover"
+            className="h-10 w-10 shrink-0 rounded-md object-cover"
           />
         ) : (
           <video
@@ -167,9 +177,15 @@ export function UploadProgressLayer() {
             muted
             playsInline
             preload="metadata"
-            className="h-16 w-16 object-cover"
+            className="h-10 w-10 shrink-0 rounded-md object-cover"
           />
         )}
+        <div className="min-w-0 flex-1">
+          <div className="break-all text-xs leading-tight t-primary">{it.name}</div>
+          <div className="mt-0.5 text-[11px] tabular-nums t-secondary">
+            {formatBytes(it.size)}
+          </div>
+        </div>
       </a>
     );
   };
@@ -283,7 +299,7 @@ export function UploadProgressLayer() {
           </button>
         )}
         {doneExpanded && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-1.5">
             {done.map(renderThumb)}
           </div>
         )}
