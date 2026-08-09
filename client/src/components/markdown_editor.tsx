@@ -6,7 +6,7 @@ import Loading from 'react-loading';
 import { FlatInset, FlatTabButton } from "@rin/ui";
 import { useAlert } from "./dialog";
 import { useColorMode } from "../utils/darkModeUtils";
-import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE, DEFAULT_VIDEO_MAX_FILE_SIZE, isVideoFile, buildMarkdownVideo, uploadVideoToNetpan, isAudioFile, uploadFileToNetpan, buildMarkdownAudio, buildMarkdownFile, attachVideoPoster } from "../utils/image-upload";
+import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE, DEFAULT_VIDEO_MAX_FILE_SIZE, isVideoFile, buildMarkdownVideo, uploadVideoToNetpan, isAudioFile, uploadFileToNetpan, buildMarkdownAudio, buildMarkdownFile, attachVideoPoster, uploadOriginalToNetpan, shouldUploadOriginal } from "../utils/image-upload";
 import { NETPAN_MAX_FILE_SIZE } from "../netpan";
 import { isImageCompressEnabled, setImageCompressEnabled } from "../utils/compress-pref";
 import { compressImageFile } from "../utils/image-compress";
@@ -88,6 +88,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
   const [preview, setPreview] = useState<'edit' | 'preview' | 'comparison'>('edit');
   const [uploading, setUploading] = useState(false);
   const [compressOn, setCompressOn] = useState<boolean>(isImageCompressEnabled());
+  const [originalOn, setOriginalOn] = useState<boolean>(true);
   const { showAlert, AlertUI } = useAlert();
 
   async function insertImage(
@@ -498,11 +499,23 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           // safely uploads videos raw to R2 with no extra processing.
           const result = await uploadImageFile(file, onProgress, signal);
           if (isImageFile(file)) {
+            // 压缩图已传 R2；若开启「原图」且压缩也开、原图够大（真照片），
+            // 再传一份未压缩原图到 netpan，供文章「查看原图」按需加载。
+            // 原图失败不影响正文（压缩图已在），故吞掉异常。
+            let originalUrl: string | undefined;
+            if (originalOn && compressOn && shouldUploadOriginal(file.size)) {
+              try {
+                originalUrl = await uploadOriginalToNetpan(file, onProgress, signal);
+              } catch {
+                originalUrl = undefined;
+              }
+            }
             return {
               snippet: buildMarkdownImage(file.name, result.url, {
                 blurhash: result.blurhash,
                 width: result.width,
                 height: result.height,
+                original: originalUrl,
               }),
               url: result.url,
             };
@@ -787,6 +800,16 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
               setImageCompressEnabled(next);
             }}
           />
+          <MarkdownToolButton
+            label={originalOn ? "原图：开" : "原图：关"}
+            icon="ri-image-line"
+            active={originalOn}
+            disabled={!compressOn}
+            onClick={() => {
+              if (!compressOn) return;
+              setOriginalOn(!originalOn);
+            }}
+          />
         </div>
         {uploading &&
           <div className="flex flex-row items-center space-x-2 px-2">
@@ -823,11 +846,22 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
                 async (file, onProgress, signal) => {
                   if (isImageFile(file)) {
                     const result = await uploadImageFile(file, onProgress, signal);
+                    // 压缩图已传 R2；若开启「原图」且压缩也开、原图够大（真照片），
+                    // 再传一份未压缩原图到 netpan，供文章「查看原图」按需加载。
+                    let originalUrl: string | undefined;
+                    if (originalOn && compressOn && shouldUploadOriginal(file.size)) {
+                      try {
+                        originalUrl = await uploadOriginalToNetpan(file, onProgress, signal);
+                      } catch {
+                        originalUrl = undefined;
+                      }
+                    }
                     return {
                       snippet: buildMarkdownImage(file.name, result.url, {
                         blurhash: result.blurhash,
                         width: result.width,
                         height: result.height,
+                        original: originalUrl,
                       }),
                       url: result.url,
                     };

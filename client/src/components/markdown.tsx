@@ -196,6 +196,7 @@ function MarkdownImage({
   src,
   alt,
   show,
+  showOriginal,
   rounded,
   scale,
   className,
@@ -203,12 +204,13 @@ function MarkdownImage({
   src?: string;
   alt?: string;
   show: (src?: string) => void;
+  showOriginal: (original: string) => void;
   rounded: boolean;
   scale: string;
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { src: cleanSrc, blurhash, width, height } = parseImageUrlMetadata(src);
+  const { src: cleanSrc, blurhash, width, height, original } = parseImageUrlMetadata(src);
   const [actualSrc, setActualSrc] = useState<string | undefined>(undefined);
   const [naturalRatio, setNaturalRatio] = useState<string | undefined>(undefined);
   const { failed, imageRef, loaded, onError, onLoad } = useImageLoadState(actualSrc);
@@ -328,6 +330,7 @@ function MarkdownImage({
         width={width}
         height={height}
         decoding="async"
+        data-original={original}
         onClick={() => {
           show(cleanSrc);
         }}
@@ -337,6 +340,15 @@ function MarkdownImage({
           className || ""
         } ${showPlaceholder ? "opacity-0" : "opacity-100"}`}
       />
+      {original ? (
+        <button
+          type="button"
+          onClick={() => showOriginal(original)}
+          className="absolute bottom-2 right-2 z-10 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white shadow backdrop-blur transition-colors hover:bg-black/75"
+        >
+          查看原图
+        </button>
+      ) : null}
     </span>
   );
 }
@@ -475,6 +487,7 @@ export function Markdown({ content }: { content: string }) {
               src={src}
               alt={props.alt}
               show={show}
+              showOriginal={showOriginal}
               rounded={rounded}
               scale={scale}
               className={props.className}
@@ -806,6 +819,33 @@ export function Markdown({ content }: { content: string }) {
     }
     const index = slidesLocal?.findIndex((slide) => slide.src === src) ?? -1;
     setIndex(index);
+  };
+
+  // 「查看原图」：用每张图的 data-original（未压缩原图地址）构建灯箱，
+  // 打开到被点击那张的原图，支持缩放与下载保存。
+  const showOriginal = (originalUrl: string) => {
+    const parent = document.getElementsByClassName("toc-content")[0];
+    if (!parent) return;
+    const images = parent.querySelectorAll("img");
+    const slidesLocal = Array.from(images)
+      .map((image) => {
+        const url = image.getAttribute("data-original") || image.getAttribute("src") || "";
+        const filename = url.split("/").pop() || "";
+        const alt = image.getAttribute("alt") || "";
+        return {
+          src: url,
+          alt: alt,
+          imageFit: "contain" as const,
+          download: {
+            url: url,
+            filename: filename,
+          },
+        };
+      })
+      .filter((slide) => slide.src !== "");
+    slides.current = slidesLocal;
+    const index = slidesLocal.findIndex((slide) => slide.src === originalUrl);
+    setIndex(index >= 0 ? index : 0);
   };
 
   return (
