@@ -83,3 +83,19 @@ export function extractImageWithMetadata(content: string) {
     }
     return undefined;
 }
+
+// 提取文章封面：优先首图（保留 blurhash/尺寸元数据），无图时回退到 <video poster>。
+// 用于列表卡片与后台管理页的缩略图；视频文章若带 poster 即显示视频缩略图，
+// 否则返回 undefined（由前端回退到视频占位图标）。视频 src 是媒体文件本身，
+// 不能作为 <img> 缩略图，故仅在确有 poster 时才返回。
+export function extractCoverWithMetadata(content: string): string | undefined {
+    const image = extractImageWithMetadata(content);
+    if (image) return image;
+
+    const videoTag = content.match(/<video\b[^>]*>/i);
+    if (videoTag) {
+        const poster = videoTag[0].match(/\bposter=["']([^"']+)["']/i);
+        if (poster?.[1]) return poster[1];
+    }
+    return undefined;
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { contentHasImagesMissingMetadata, extractImage, extractImageWithMetadata, listContentImageUrls, stripImageMetadataFromUrl } from '../image';
+import { contentHasImagesMissingMetadata, extractCoverWithMetadata, extractImage, extractImageWithMetadata, listContentImageUrls, stripImageMetadataFromUrl } from '../image';
 
 describe('extractImage', () => {
     it('should extract image URL from markdown', () => {
@@ -48,6 +48,23 @@ describe('extractImageWithMetadata', () => {
     it('should keep image metadata fragments for UI consumers', () => {
         const content = '![alt](https://example.com/image.png#blurhash=test&width=100&height=50)';
         expect(extractImageWithMetadata(content)).toBe('https://example.com/image.png#blurhash=test&width=100&height=50');
+    });
+});
+
+describe('extractCoverWithMetadata', () => {
+    it('should prefer the first image (with metadata) when present', () => {
+        const content = '![alt](https://example.com/cover.png#blurhash=test&width=100&height=50)\n<video poster="https://example.com/poster.jpg" src="https://example.com/v.mp4"></video>';
+        expect(extractCoverWithMetadata(content)).toBe('https://example.com/cover.png#blurhash=test&width=100&height=50');
+    });
+
+    it('should fall back to <video poster> when there is no image', () => {
+        const content = 'Some text\n<video poster="https://example.com/poster.jpg" src="https://example.com/v.mp4"></video>';
+        expect(extractCoverWithMetadata(content)).toBe('https://example.com/poster.jpg');
+    });
+
+    it('should return undefined when there is neither image nor video poster', () => {
+        const content = 'Just some plain text without media';
+        expect(extractCoverWithMetadata(content)).toBeUndefined();
     });
 });
 

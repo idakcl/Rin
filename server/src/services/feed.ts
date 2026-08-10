@@ -4,7 +4,7 @@ import type { Variables } from "../core/hono-types";
 import { profileAsync } from "../core/server-timing";
 import { feeds, visits, visitStats } from "../db/schema";
 import { HyperLogLog } from "../utils/hyperloglog";
-import { extractImageWithMetadata } from "../utils/image";
+import { extractCoverWithMetadata } from "../utils/image";
 import { stripMarkdown } from "../utils/markdown";
 import { syncFeedAISummaryQueueState } from "./feed-ai-summary";
 import { bindTagToPost } from "./tag";
@@ -104,7 +104,7 @@ export function FeedService(): Hono<{
             offset: page_num * limit_num,
             limit: limit_num + 1,
         }))).map(({ content, hashtags, summary, ...other }: any) => {
-            const avatar = extractImageWithMetadata(content);
+            const avatar = extractCoverWithMetadata(content);
             const plainText = stripMarkdown(content);
             return {
                 summary: summary.length > 0 ? summary : plainText.length > 100 ? plainText.slice(0, 100) : plainText,

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { client } from "../app/runtime";
 import { useAlert, useConfirm } from "../components/dialog";
+import { parseImageUrlMetadata } from "../utils/image-upload";
 import { useTranslation } from "react-i18next";
 import type { FeedListResponse } from "@rin/api";
 
@@ -262,14 +263,39 @@ export function PostsManagePage() {
                 className="accent-theme h-4 w-4 shrink-0"
                 aria-label={t("admin.posts.select_all")}
               />
-              <Link
-                href={`/feed/${it.alias || it.id}`}
-                target="_blank"
-                className="flex-1 truncate hover:text-theme text-black dark:text-white"
-              >
-                {it.title || t("admin.posts.untitled")}
-              </Link>
-              <span className="text-xs text-neutral-400 shrink-0">
+              {it.avatar ? (
+                <Link
+                  href={`/feed/${it.alias || it.id}`}
+                  target="_blank"
+                  className="block h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-800"
+                >
+                  <img
+                    src={parseImageUrlMetadata(it.avatar).src}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                </Link>
+              ) : (
+                <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-400 dark:bg-neutral-800">
+                  <i className="ri-image-line text-lg" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <Link
+                  href={`/feed/${it.alias || it.id}`}
+                  target="_blank"
+                  className="block truncate hover:text-theme text-black dark:text-white"
+                >
+                  {it.title || t("admin.posts.untitled")}
+                </Link>
+                {it.summary ? (
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
+                    {it.summary}
+                  </p>
+                ) : null}
+              </div>
+              <span className="shrink-0 text-xs text-neutral-400">
                 {new Date(it.createdAt).toLocaleString()}
               </span>
             </li>
