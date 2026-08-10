@@ -32,11 +32,11 @@ import { useImageLoadState } from "../utils/use-image-load-state";
 // 导致后面的图被并发「饿死」停在模糊占位。
 // 控制器为模块级单例，整篇文章（乃至整页）共享同一组并发槽。
 // ---------------------------------------------------------------------------
-const MAX_CONCURRENT_IMAGES = 12;
+const MAX_CONCURRENT_IMAGES = 24;
 // 以当前浏览位置（视口中心）为基准，上下各预下载的图片张数。
 // 只激活窗口内的图片去加载，不激活整篇文章几十张，避免并发洪泛。
-const PRELOAD_AHEAD = 6;
-const PRELOAD_BEHIND = 6;
+const PRELOAD_AHEAD = 12;
+const PRELOAD_BEHIND = 12;
 
 type ImageLoadEntry = {
   el: HTMLImageElement;
@@ -231,7 +231,7 @@ function MarkdownImage({
     }
   }, [blurhash]);
 
-  // 注册到并发加载控制器：进入视口(提前 200px)才排队/加载，全局最多 5 张同时在飞。
+  // 注册到并发加载控制器：进入视口(提前 200px)才排队/加载，全局最多 24 张同时在飞。
   // 延迟设置真实 src，避免长图文章一次性发起几十个请求把后面的图「饿死」。
   useEffect(() => {
     const el = imageRef.current;
