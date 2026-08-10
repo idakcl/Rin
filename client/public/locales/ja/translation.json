@@ -29,7 +29,14 @@
       "next": "次へ",
       "partial": "{{ok}} 件削除、{{fail}} 件失敗",
       "page_info": "{{page}} ページ / 全 {{total}} 件",
-      "untitled": "無題の投稿"
+      "untitled": "無題の投稿",
+      "move_to_list": "記事リストに移動",
+      "move_out_list": "リストから除外",
+      "move_to_draft": "下書きに移動",
+      "move_to_list_confirm": "選択した {{count}} 件を公開リストに移動しますか？",
+      "move_out_list_confirm": "選択した {{count}} 件をリストから除外（非公開）しますか？",
+      "move_to_draft_confirm": "選択した {{count}} 件を下書きに移動しますか？",
+      "move_done": "{{count}} 件を更新しました"
     }
   },
   "compat_tasks": {

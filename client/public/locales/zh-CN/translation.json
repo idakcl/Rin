@@ -29,7 +29,14 @@
       "next": "下一页",
       "partial": "已删除 {{ok}} 篇，失败 {{fail}} 篇",
       "page_info": "第 {{page}} 页 / 共 {{total}} 篇",
-      "untitled": "未命名文章"
+      "untitled": "未命名文章",
+      "move_to_list": "移入文章列表",
+      "move_out_list": "移出文章列表",
+      "move_to_draft": "移入草稿箱",
+      "move_to_list_confirm": "确定将选中的 {{count}} 篇文章移入文章列表（公开）吗？",
+      "move_out_list_confirm": "确定将选中的 {{count}} 篇文章移出文章列表（转为未发布）吗？",
+      "move_to_draft_confirm": "确定将选中的 {{count}} 篇文章移入草稿箱吗？",
+      "move_done": "已更新 {{count}} 篇"
     }
   },
   "compat_tasks": {

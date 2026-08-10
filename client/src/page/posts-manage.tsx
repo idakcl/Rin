@@ -138,6 +138,39 @@ export function PostsManagePage() {
     );
   };
 
+  // 批量变更文章状态。后端 POST /feed/:id 为合并更新：仅传 listed/draft，
+  // 其余字段 undefined 会被跳过，因此无需先读取现有状态即可直接设定目标状态。
+  // - toList：移入文章列表（公开）  listed=true,  draft=false
+  // - outList：移出文章列表（未发布）listed=false, draft=false
+  // - toDraft：移入草稿箱          listed=false, draft=true
+  type MoveAction = "toList" | "outList" | "toDraft";
+  const moveConfig: Record<MoveAction, { listed: boolean; draft: boolean; btn: string; confirm: string }> = {
+    toList: { listed: true, draft: false, btn: "admin.posts.move_to_list", confirm: "admin.posts.move_to_list_confirm" },
+    outList: { listed: false, draft: false, btn: "admin.posts.move_out_list", confirm: "admin.posts.move_out_list_confirm" },
+    toDraft: { listed: false, draft: true, btn: "admin.posts.move_to_draft", confirm: "admin.posts.move_to_draft_confirm" },
+  };
+  const batchMove = (action: MoveAction) => {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    const cfg = moveConfig[action];
+    showConfirm(
+      t(cfg.btn),
+      t(cfg.confirm, { count: ids.length }),
+      async () => {
+        const results = await Promise.allSettled(
+          ids.map((id) => client.feed.update(id, { listed: cfg.listed, draft: cfg.draft })),
+        );
+        const ok = results.filter(
+          (r) => r.status === "fulfilled" && !(r.value as { error?: unknown } | undefined)?.error,
+        ).length;
+        const fail = ids.length - ok;
+        showAlert(fail === 0 ? t("admin.posts.move_done", { count: ok }) : t("admin.posts.partial", { ok, fail }));
+        setSelected(new Set());
+        run(page, filter, keyword);
+      },
+    );
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-6">
       {/* 工具栏：状态筛选 + 搜索 */}
@@ -165,24 +198,48 @@ export function PostsManagePage() {
         />
       </div>
 
-      {/* 批量操作条：全选 + 删除选中 */}
-      <div className="flex items-center gap-3 text-sm mb-4">
+      {/* 批量操作条：全选 + 删除选中 + 批量移动状态 */}
+      <div className="flex flex-wrap items-center gap-3 text-sm mb-4">
         <label className="flex items-center gap-1 cursor-pointer select-none text-neutral-600 dark:text-neutral-300">
           <input type="checkbox" checked={allChecked} onChange={toggleAll} className="accent-theme h-4 w-4" />
           {t("admin.posts.select_all")}
         </label>
         {selected.size > 0 && (
-          <button
-            type="button"
-            onClick={batchDelete}
-            className="px-3 py-1 rounded bg-red-500 text-white text-sm hover:bg-red-600 inline-flex items-center gap-1"
-          >
-            <i className="ri-delete-bin-line" />
-            {t("admin.posts.batch_delete")} ({selected.size})
-          </button>
-        )}
-        {selected.size > 0 && (
-          <span className="text-neutral-500">{t("admin.posts.selected", { count: selected.size })}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={batchDelete}
+              className="px-3 py-1 rounded bg-red-500 text-white text-sm hover:bg-red-600 inline-flex items-center gap-1"
+            >
+              <i className="ri-delete-bin-line" />
+              {t("admin.posts.batch_delete")} ({selected.size})
+            </button>
+            <button
+              type="button"
+              onClick={() => batchMove("toList")}
+              className="px-3 py-1 rounded border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 text-sm hover:bg-neutral-100 dark:hover:bg-white/10 inline-flex items-center gap-1"
+            >
+              <i className="ri-eye-line" />
+              {t("admin.posts.move_to_list")}
+            </button>
+            <button
+              type="button"
+              onClick={() => batchMove("outList")}
+              className="px-3 py-1 rounded border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 text-sm hover:bg-neutral-100 dark:hover:bg-white/10 inline-flex items-center gap-1"
+            >
+              <i className="ri-eye-off-line" />
+              {t("admin.posts.move_out_list")}
+            </button>
+            <button
+              type="button"
+              onClick={() => batchMove("toDraft")}
+              className="px-3 py-1 rounded border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 text-sm hover:bg-neutral-100 dark:hover:bg-white/10 inline-flex items-center gap-1"
+            >
+              <i className="ri-file-edit-line" />
+              {t("admin.posts.move_to_draft")}
+            </button>
+            <span className="text-neutral-500">{t("admin.posts.selected", { count: selected.size })}</span>
+          </div>
         )}
       </div>
 

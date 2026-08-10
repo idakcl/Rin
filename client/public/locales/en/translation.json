@@ -29,7 +29,14 @@
       "next": "Next",
       "partial": "Deleted {{ok}}, failed {{fail}}",
       "page_info": "Page {{page}} / {{total}} total",
-      "untitled": "Untitled post"
+      "untitled": "Untitled post",
+      "move_to_list": "Move to list",
+      "move_out_list": "Remove from list",
+      "move_to_draft": "Move to drafts",
+      "move_to_list_confirm": "Move the selected {{count}} post(s) to the public list?",
+      "move_out_list_confirm": "Remove the selected {{count}} post(s) from the list (unlisted)?",
+      "move_to_draft_confirm": "Move the selected {{count}} post(s) to drafts?",
+      "move_done": "Updated {{count}}"
     }
   },
   "compat_tasks": {
