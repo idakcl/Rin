@@ -360,9 +360,13 @@ export async function uploadFileToNetpan(
   file: File,
   onProgress?: (pct: number) => void,
   signal?: AbortSignal,
+  onCompressedSize?: (size: number) => void,
 ): Promise<string> {
   // 图片在上传前压缩（受全局开关控制；非图片原样返回）。
   const toUpload = await compressImageFile(file);
+  // 压缩后立即回调压缩后体积，让上传悬浮窗把「显示大小」更新为实际将要
+  // 传输的体积（而非原图体积）；非图片文件压缩后仍是原文件，回调原大小，无害。
+  onCompressedSize?.(toUpload.size);
   return uploadToNetpanWithProgress(toUpload, onProgress, signal);
 }
 

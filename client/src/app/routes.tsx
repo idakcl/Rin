@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { lazy, Suspense, useContext } from "react";
+import { Suspense, useContext } from "react";
+import { lazyWithRetry } from "./lazy-with-retry";
 import type { DefaultParams, PathPattern } from "wouter";
 import { Route, Switch } from "wouter";
 import { AdminLayout } from "../components/admin-layout";
@@ -16,20 +17,20 @@ import { FeedPage, TOCHeader } from "../page/feed";
 
 // 路由级代码分割：除首页 FeedsPage、文章页 FeedPage 外，其余页面按需懒加载，
 // 把 monaco(写作页)、各后台页、timeline/moments 等移出首屏 bundle。
-const CallbackPage = lazy(() => import("../page/callback").then((m) => ({ default: m.CallbackPage })));
-const CompatTasksPage = lazy(() => import("../page/compat-tasks").then((m) => ({ default: m.CompatTasksPage })));
-const FriendsPage = lazy(() => import("../page/friends").then((m) => ({ default: m.FriendsPage })));
-const HealthPage = lazy(() => import("../page/health").then((m) => ({ default: m.HealthPage })));
-const HashtagPage = lazy(() => import("../page/hashtag").then((m) => ({ default: m.HashtagPage })));
-const HashtagsPage = lazy(() => import("../page/hashtags").then((m) => ({ default: m.HashtagsPage })));
-const LoginPage = lazy(() => import("../page/login").then((m) => ({ default: m.LoginPage })));
-const MomentsPage = lazy(() => import("../page/moments").then((m) => ({ default: m.MomentsPage })));
-const ProfilePage = lazy(() => import("../page/profile").then((m) => ({ default: m.ProfilePage })));
-const QueueStatusPage = lazy(() => import("../page/queue-status").then((m) => ({ default: m.QueueStatusPage })));
-const SearchPage = lazy(() => import("../page/search").then((m) => ({ default: m.SearchPage })));
-const Settings = lazy(() => import("../page/settings").then((m) => ({ default: m.Settings })));
-const TimelinePage = lazy(() => import("../page/timeline").then((m) => ({ default: m.TimelinePage })));
-const WritingPage = lazy(() => import("../page/writing").then((m) => ({ default: m.WritingPage })));
+const CallbackPage = lazyWithRetry(() => import("../page/callback").then((m) => ({ default: m.CallbackPage })));
+const CompatTasksPage = lazyWithRetry(() => import("../page/compat-tasks").then((m) => ({ default: m.CompatTasksPage })));
+const FriendsPage = lazyWithRetry(() => import("../page/friends").then((m) => ({ default: m.FriendsPage })));
+const HealthPage = lazyWithRetry(() => import("../page/health").then((m) => ({ default: m.HealthPage })));
+const HashtagPage = lazyWithRetry(() => import("../page/hashtag").then((m) => ({ default: m.HashtagPage })));
+const HashtagsPage = lazyWithRetry(() => import("../page/hashtags").then((m) => ({ default: m.HashtagsPage })));
+const LoginPage = lazyWithRetry(() => import("../page/login").then((m) => ({ default: m.LoginPage })));
+const MomentsPage = lazyWithRetry(() => import("../page/moments").then((m) => ({ default: m.MomentsPage })));
+const ProfilePage = lazyWithRetry(() => import("../page/profile").then((m) => ({ default: m.ProfilePage })));
+const QueueStatusPage = lazyWithRetry(() => import("../page/queue-status").then((m) => ({ default: m.QueueStatusPage })));
+const SearchPage = lazyWithRetry(() => import("../page/search").then((m) => ({ default: m.SearchPage })));
+const Settings = lazyWithRetry(() => import("../page/settings").then((m) => ({ default: m.Settings })));
+const TimelinePage = lazyWithRetry(() => import("../page/timeline").then((m) => ({ default: m.TimelinePage })));
+const WritingPage = lazyWithRetry(() => import("../page/writing").then((m) => ({ default: m.WritingPage })));
 import { ProfileContext } from "../state/profile";
 import { tryInt } from "../utils/int";
 import { useTranslation } from "react-i18next";
@@ -166,7 +167,7 @@ function AppRoute({
           header: <Header>{headerComponent}</Header>,
           content: (
             <Padding className={paddingClassName}>
-              <Suspense fallback={null}>{resolvedContent}</Suspense>
+              <Suspense fallback={<RouteLoading />}>{resolvedContent}</Suspense>
             </Padding>
           ),
           footer: <Footer />,
@@ -199,11 +200,11 @@ function AdminRoute({
     <Route path={path}>
       {(params) => (
         <AdminLayout title={title} description={description}>
-          {/* 后台页（Health/QueueStatus/CompatTasks/Settings/Writing 等）已改为 lazy()，
+          {/* 后台页（Health/QueueStatus/CompatTasks/Settings/Writing 等）已改为 lazyWithRetry()（带失败自动重试），
               必须套一层 Suspense 接住挂起，否则点进后台时懒加载组件挂起会抛
               React #426 "suspended while responding to synchronous input" 白屏。
               与前台 AppRoute 保持一致的写法。 */}
-          <Suspense fallback={null}>
+          <Suspense fallback={<RouteLoading />}>
             {typeof content === "function" ? content(params) : content}
           </Suspense>
         </AdminLayout>
@@ -225,5 +226,19 @@ function TocRoute({
     <AppRoute path={path} headerComponent={TOCHeader({ TOC })} paddingClassName="mx-4">
       {(params) => children(params, TOC, cleanup)}
     </AppRoute>
+  );
+}
+
+// 路由级懒加载（含写作页 / monaco 等大 chunk）加载中 / 重试期间的占位。
+// 替代原来的 `fallback={null}` 白屏，让用户明确看到「正在加载」而非误判为卡死。
+function RouteLoading() {
+  return (
+    <div className="flex min-h-[40vh] w-full items-center justify-center">
+      <div
+        className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-600 dark:border-neutral-700 dark:border-t-neutral-300"
+        role="status"
+        aria-label="Loading"
+      />
+    </div>
   );
 }

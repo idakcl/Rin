@@ -548,10 +548,12 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           if (isVideoFile(file) && file.size > NETPAN_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(NETPAN_MAX_FILE_SIZE / 1024 / 1024) });
           return null;
         },
-        async (file, onProgress, signal) => {
+        async (file, onProgress, signal, onCompressedSize) => {
           // Both images and videos selected here upload to netpan (not R2),
           // so the button acts as a unified netpan media uploader.
-          const url = await uploadFileToNetpan(file, onProgress, signal);
+          // 透传 onCompressedSize：压缩完成后把悬浮窗「显示大小」更新为
+          // 实际将要传输的压缩后体积（而非原图体积）。
+          const url = await uploadFileToNetpan(file, onProgress, signal, onCompressedSize);
           if (isImageFile(file)) {
             return { snippet: buildMarkdownImage(file.name, url), url };
           }
