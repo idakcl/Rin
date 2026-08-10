@@ -21,8 +21,6 @@ type ImageMetadata = {
   blurhash?: string;
   width?: number;
   height?: number;
-  // 未压缩原图地址（走 netpan），供文章「查看原图」按需加载。
-  original?: string;
 };
 
 type MarkdownImageMetadataResult = {
@@ -56,8 +54,8 @@ function toPositiveInteger(value?: string | null) {
 }
 
 export function attachImageMetadataToUrl(url: string, metadata: ImageMetadata = {}) {
-  const { blurhash, width, height, original } = metadata;
-  if (!blurhash && !width && !height && !original) {
+  const { blurhash, width, height } = metadata;
+  if (!blurhash && !width && !height) {
     return url;
   }
 
@@ -72,9 +70,6 @@ export function attachImageMetadataToUrl(url: string, metadata: ImageMetadata = 
   if (height) {
     params.set("height", String(height));
   }
-  if (original) {
-    params.set("original", original);
-  }
   return `${baseUrl}#${params.toString()}`;
 }
 
@@ -83,7 +78,6 @@ export function parseImageUrlMetadata(url?: string | null) {
     return {
       src: "",
       blurhash: undefined as string | undefined,
-      original: undefined as string | undefined,
     };
   }
 
@@ -95,7 +89,6 @@ export function parseImageUrlMetadata(url?: string | null) {
     blurhash: params.get("blurhash") || undefined,
     width: toPositiveInteger(params.get("width")),
     height: toPositiveInteger(params.get("height")),
-    original: params.get("original") || undefined,
   };
 }
 
@@ -367,23 +360,6 @@ export async function uploadFileToNetpan(
   // 图片在上传前压缩（受全局开关控制；非图片原样返回）。
   const toUpload = await compressImageFile(file);
   return uploadToNetpanWithProgress(toUpload, onProgress, signal);
-}
-
-// 上传「原图」（未压缩）到 netpan，供文章「查看原图」按需加载。
-// 注意：不走 uploadFileToNetpan（那会再压缩一次），直接原始上传。
-export async function uploadOriginalToNetpan(
-  file: File,
-  onProgress?: (pct: number) => void,
-  signal?: AbortSignal,
-): Promise<string> {
-  return uploadToNetpanWithProgress(file, onProgress, signal);
-}
-
-// 仅当原图足够大（真照片）才单独存一份原图到 netpan；
-// 小图/截图压缩后已很小，再存一份原图纯属冗余存储。
-const ORIGINAL_MIN_ORIGINAL_BYTES = 1 * 1024 * 1024;
-export function shouldUploadOriginal(originalSize: number): boolean {
-  return originalSize >= ORIGINAL_MIN_ORIGINAL_BYTES;
 }
 
 // ---------------------------------------------------------------------------
