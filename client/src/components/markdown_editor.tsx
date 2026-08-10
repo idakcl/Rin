@@ -6,9 +6,8 @@ import Loading from 'react-loading';
 import { FlatInset, FlatTabButton } from "@rin/ui";
 import { useAlert } from "./dialog";
 import { useColorMode } from "../utils/darkModeUtils";
-import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE, DEFAULT_VIDEO_MAX_FILE_SIZE, isVideoFile, buildMarkdownVideo, uploadVideoToNetpan, isAudioFile, uploadFileToNetpan, buildMarkdownAudio, buildMarkdownFile, attachVideoPoster } from "../utils/image-upload";
+import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_VIDEO_MAX_FILE_SIZE, isVideoFile, buildMarkdownVideo, uploadVideoToNetpan, isAudioFile, uploadFileToNetpan, buildMarkdownAudio, buildMarkdownFile, attachVideoPoster } from "../utils/image-upload";
 import { NETPAN_MAX_FILE_SIZE } from "../netpan";
-import { compressImageFile } from "../utils/image-compress";
 import { Markdown } from "./markdown";
 import { mapWithConcurrency } from "../utils/concurrency";
 import { addUpload, setUploadStatus, setUploadProgress, setUploadSize, setUploadUrl, registerRetry, registerAbort } from "../utils/upload-progress-store";
@@ -477,14 +476,8 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           // The first button is backed by Cloudflare R2: images get the
           // blurhash/metadata optimization path, videos upload raw (no
           // transcode) — both land in the same R2 bucket.
-          if (isImageFile(file)) {
-            // 原图已在上限内：压缩后必然更小，直接放行，避免无谓的二次压缩。
-            if (file.size <= DEFAULT_IMAGE_MAX_FILE_SIZE) return null;
-            // 原图超限：先在浏览器内压缩，压缩后仍超才提示（绝大多数大图压完远小于上限）。
-            const compressed = await compressImageFile(file);
-            if (compressed.size > DEFAULT_IMAGE_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(DEFAULT_IMAGE_MAX_FILE_SIZE / 1024 / 1024) });
-            return null;
-          }
+          // 图片：客户端会压缩到 800KB 以下，不再限制原图大小。
+          if (isImageFile(file)) return null;
           if (isVideoFile(file)) {
             if (file.size > DEFAULT_VIDEO_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(DEFAULT_VIDEO_MAX_FILE_SIZE / 1024 / 1024) });
             return null;
@@ -551,7 +544,8 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
         files,
         (file) => {
           if (!isVideoFile(file) && !isImageFile(file)) return t("upload.unsupported_type");
-          if (file.size > NETPAN_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(NETPAN_MAX_FILE_SIZE / 1024 / 1024) });
+          // 图片：会压缩到 800KB 以下，不再限制原图大小；视频保留图床上限。
+          if (isVideoFile(file) && file.size > NETPAN_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(NETPAN_MAX_FILE_SIZE / 1024 / 1024) });
           return null;
         },
         async (file, onProgress, signal) => {
@@ -794,14 +788,8 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
               void insertMediaSequentially(
                 files,
                 async (file) => {
-                  if (isImageFile(file)) {
-                    // 原图已在上限内：压缩后必然更小，直接放行，避免无谓的二次压缩。
-                    if (file.size <= DEFAULT_IMAGE_MAX_FILE_SIZE) return null;
-                    // 原图超限：先在浏览器内压缩，压缩后仍超才提示。
-                    const compressed = await compressImageFile(file);
-                    if (compressed.size > DEFAULT_IMAGE_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(DEFAULT_IMAGE_MAX_FILE_SIZE / 1024 / 1024) });
-                    return null;
-                  }
+                  // 图片：客户端会压缩到 800KB 以下，不再限制原图大小。
+                  if (isImageFile(file)) return null;
                   if (isVideoFile(file)) {
                     if (file.size > NETPAN_MAX_FILE_SIZE) return t("upload.failed$size", { size: Math.round(NETPAN_MAX_FILE_SIZE / 1024 / 1024) });
                     return null;
