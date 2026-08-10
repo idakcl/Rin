@@ -163,11 +163,22 @@ async function getArticleOg(request: Request, env: Env, id: string): Promise<OgD
     ).slice(0, 200);
     // og:image 剥离 #blurhash=...&width=...&height=... 片段：爬虫忽略 #，但留着不干净；
     // 同时本端点不支持按 width 缩放，缩略图需另立后端任务，此处先保证 URL 干净。
+    // 文章正文里的图片常为相对路径(如 /api/blob/images/xxx)，爬虫无法识别，需补全为绝对 URL。
     const rawImage = extractImageWithMetadata(content);
-    const image = rawImage ? safeUrl(rawImage.split("#")[0]) : undefined;
-    // 站点名取自 Worker env vars（与站点卡片一致）
+    let image: string | undefined;
+    if (rawImage) {
+      const base = new URL(request.url).origin;
+      const raw = rawImage.split("#")[0];
+      const abs =
+        raw.startsWith("http://") || raw.startsWith("https://")
+          ? raw
+          : new URL(raw, base).toString();
+      image = safeUrl(abs) ?? safeUrl(raw);
+    }
+    // 站点名取自后台实时配置(与站点卡片一致)，env 仅作兜底
+    const liveSite = await fetchLiveSiteConfig(request, env);
     const ev = env as unknown as Record<string, any>;
-    const siteName = typeof ev?.NAME === "string" ? ev.NAME : "";
+    const siteName = liveSite.name || (typeof ev?.NAME === "string" ? ev.NAME : "");
     return {
       type: "article",
       title: escapeHtmlAttr(title),
@@ -182,22 +193,45 @@ async function getArticleOg(request: Request, env: Env, id: string): Promise<OgD
   }
 }
 
+// 读取后台实时站点配置(站名/描述/头像)：来自公开端点 /config/client(clientConfig，存于 D1)。
+// 不能依赖部署时固定的 Worker 环境变量(NAME/DESCRIPTION/AVATAR，仅为默认值)，
+// 否则分享卡片不会反映用户在后台改过的简介与图标。该端点无需管理员鉴权。
+async function fetchLiveSiteConfig(
+  request: Request,
+  env: Env,
+): Promise<{ name: string; description: string; avatar: string }> {
+  const empty = { name: "", description: "", avatar: "" };
+  try {
+    const origin = new URL(request.url).origin;
+    const cfgReq = new Request(new URL("/config/client", origin), request);
+    const res = await getApp().fetch(cfgReq, env);
+    if (!res.ok) return empty;
+    const data = (await res.json()) as any;
+    const site = data?.site ?? {};
+    const name = site.name ?? data?.["site.name"];
+    const description = site.description ?? data?.["site.description"];
+    const avatar = site.avatar ?? data?.["site.avatar"];
+    return {
+      name: typeof name === "string" ? name : "",
+      description: typeof description === "string" ? description : "",
+      avatar: typeof avatar === "string" ? avatar : "",
+    };
+  } catch {
+    return empty;
+  }
+}
+
 // 站点级卡片(首页/标签页/关于等非文章页)：用站点配置
 async function getSiteOg(request: Request, env: Env): Promise<OgData> {
-  let name = "";
-  let description = "";
-  let avatar = "";
-  try {
-    // 站点名/描述/头像由部署时通过 wrangler [vars] 注入 Worker 环境变量，直接读取即可。
-    // 不走 /config 端点：该端点需要管理员鉴权，OG 预览的内部请求会拿到 401，
-    // 导致卡片只剩 og:type/og:url，缺标题/描述/封面。env vars 即站点配置来源，无需鉴权。
-    const ev = env as unknown as Record<string, any>;
-    name = typeof ev?.NAME === "string" ? ev.NAME : "";
-    description = typeof ev?.DESCRIPTION === "string" ? ev.DESCRIPTION : "";
-    avatar = typeof ev?.AVATAR === "string" ? ev.AVATAR : "";
-  } catch {
-    /* 取不到就用空值，文章卡片不受影响 */
-  }
+  const live = await fetchLiveSiteConfig(request, env);
+  let name = live.name;
+  let description = live.description;
+  let avatar = live.avatar;
+  // env 兜底：仅当 /config/client 未提供对应值时，才用部署时固定的默认值
+  const ev = env as unknown as Record<string, any>;
+  if (!name && typeof ev?.NAME === "string" && ev.NAME) name = ev.NAME;
+  if (!description && typeof ev?.DESCRIPTION === "string" && ev.DESCRIPTION) description = ev.DESCRIPTION;
+  if (!avatar && typeof ev?.AVATAR === "string" && ev.AVATAR) avatar = ev.AVATAR;
   const image = safeUrl(avatar);
   return {
     type: "website",
