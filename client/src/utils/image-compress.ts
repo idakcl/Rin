@@ -5,7 +5,8 @@
 // 不做动态质量调节——统一的固定档位既能满足博客展示清晰度，又让体积可控。
 //
 // 设计要点：
-// - 强制开启、忽略开关偏好：任何图片都重编码为 WebP，不再有「关」的路径。
+// - 强制开启、忽略开关偏好：任何图片都重编码为更小体积（优先 WebP，
+//   浏览器不支持 WebP 编码时回退 JPEG），不再有「关」的路径。
 // - SVG / GIF 跳过（矢量不重编码、动图保留动画）。
 // - 已经很小且不超边长上限的图跳过，避免 WebP 开销导致反而变大。
 // - 压缩后体积没变小也退回原图（安全兜底）。
@@ -27,6 +28,12 @@ function renameToWebp(name: string): string {
   const dot = name.lastIndexOf(".");
   if (dot > 0) return `${name.slice(0, dot)}.webp`;
   return `${name}.webp`;
+}
+
+function renameToJpeg(name: string): string {
+  const dot = name.lastIndexOf(".");
+  if (dot > 0) return `${name.slice(0, dot)}.jpeg`;
+  return `${name}.jpeg`;
 }
 
 export async function compressImageFile(
@@ -79,11 +86,19 @@ export async function compressImageFile(
   ctx.drawImage(bitmap, 0, 0, w, h);
   bitmap.close?.();
 
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/webp", quality),
-  );
-  if (!blob) return file;
+  const tryEncode = (type: string, q: number) =>
+    new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, q));
 
-  const out = new File([blob], renameToWebp(file.name), { type: "image/webp" });
-  return out.size < file.size ? out : file;
+  // 优先 WebP（体积最小）。若浏览器不支持 WebP 编码（toBlob 返回 null）或
+  // WebP 不比原图小，则回退到 JPEG——保证「压缩」一定发生（缩小尺寸 + 有损），
+  // 彻底杜绝大原图不经压缩直传 R2 / netpan。
+  const webp = await tryEncode("image/webp", quality);
+  if (webp && webp.size < file.size) {
+    return new File([webp], renameToWebp(file.name), { type: "image/webp" });
+  }
+  const jpeg = await tryEncode("image/jpeg", Math.min(0.92, quality + 0.42));
+  if (jpeg && jpeg.size < file.size) {
+    return new File([jpeg], renameToJpeg(file.name), { type: "image/jpeg" });
+  }
+  return file;
 }
