@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- 图片/视频图床为跨域域名 netpan.1234.nyc.mn：提前建连（DNS+TLS），
+         缩短文章页首次拉取 netpan 图片的往返延迟。dns-prefetch 作为不支持
+         preconnect 的旧浏览器兜底。 -->
+    <link rel="preconnect" href="https://netpan.1234.nyc.mn" crossorigin />
+    <link rel="dns-prefetch" href="https://netpan.1234.nyc.mn" />
     <!-- 微信/iOS 不自动把数字/电话识别成蓝色链接，避免干扰阅读 -->
     <meta name="format-detection" content="telephone=no" />
     <meta name="theme-color" content="#ffffff" />
