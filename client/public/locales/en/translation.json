@@ -10,7 +10,27 @@
     "queue_status_description": "Inspect AI summary queue progress, recent task results, and failures.",
     "settings_description": "Manage site behavior, integrations, and publishing rules in one place.",
     "title": "Admin",
-    "writing_description": "Write, edit, and publish content from the private management workspace."
+    "writing_description": "Write, edit, and publish content from the private management workspace.",
+    "posts": {
+      "title": "Posts",
+      "description": "Batch view, filter and delete site posts.",
+      "loading": "Loading...",
+      "search_placeholder": "Search post title / content",
+      "filter_all": "All",
+      "filter_normal": "Published",
+      "filter_draft": "Draft",
+      "filter_unlisted": "Unlisted",
+      "select_all": "Select page",
+      "batch_delete": "Delete selected",
+      "delete_selected_confirm": "Delete the selected {{count}} post(s)? This cannot be undone.",
+      "empty": "No posts",
+      "selected": "{{count}} selected",
+      "prev": "Prev",
+      "next": "Next",
+      "partial": "Deleted {{ok}}, failed {{fail}}",
+      "page_info": "Page {{page}} / {{total}} total",
+      "untitled": "Untitled post"
+    }
   },
   "compat_tasks": {
     "title": "Compatibility Tasks",

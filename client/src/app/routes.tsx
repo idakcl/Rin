@@ -31,6 +31,7 @@ const SearchPage = lazyWithRetry(() => import("../page/search").then((m) => ({ d
 const Settings = lazyWithRetry(() => import("../page/settings").then((m) => ({ default: m.Settings })));
 const TimelinePage = lazyWithRetry(() => import("../page/timeline").then((m) => ({ default: m.TimelinePage })));
 const WritingPage = lazyWithRetry(() => import("../page/writing").then((m) => ({ default: m.WritingPage })));
+const PostsManagePage = lazyWithRetry(() => import("../page/posts-manage").then((m) => ({ default: m.PostsManagePage })));
 import { ProfileContext } from "../state/profile";
 import { tryInt } from "../utils/int";
 import { useTranslation } from "react-i18next";
@@ -90,6 +91,10 @@ export function AppRoutes() {
 
       <AdminRoute path="/admin/writing/:id" requirePermission title={t("writing")} description={t("admin.writing_description")}>
         {({ id }) => <WritingPage key={id} id={tryInt(0, id)} />}
+      </AdminRoute>
+
+      <AdminRoute path="/admin/posts" requirePermission title={t("admin.posts.title")} description={t("admin.posts.description")}>
+        <PostsManagePage />
       </AdminRoute>
 
       <AppRoute path="/callback">

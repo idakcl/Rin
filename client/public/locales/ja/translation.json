@@ -10,7 +10,27 @@
     "queue_status_description": "AI 要約キューの進行状況、最近のタスク結果、失敗内容を確認します。",
     "settings_description": "サイトの挙動、連携設定、公開ルールを一か所で管理します。",
     "title": "管理画面",
-    "writing_description": "非公開の管理ワークスペースから記事を作成、編集、公開します。"
+    "writing_description": "非公開の管理ワークスペースから記事を作成、編集、公開します。",
+    "posts": {
+      "title": "投稿管理",
+      "description": "サイトの投稿を一括で表示・絞り込み・削除します。",
+      "loading": "読み込み中...",
+      "search_placeholder": "投稿のタイトル / 内容を検索",
+      "filter_all": "すべて",
+      "filter_normal": "公開済み",
+      "filter_draft": "下書き",
+      "filter_unlisted": "非公開",
+      "select_all": "ページを全選択",
+      "batch_delete": "選択を削除",
+      "delete_selected_confirm": "選択した {{count}} 件の投稿を削除しますか？この操作は取り消せません。",
+      "empty": "投稿がありません",
+      "selected": "{{count}} 件選択中",
+      "prev": "前へ",
+      "next": "次へ",
+      "partial": "{{ok}} 件削除、{{fail}} 件失敗",
+      "page_info": "{{page}} ページ / 全 {{total}} 件",
+      "untitled": "無題の投稿"
+    }
   },
   "compat_tasks": {
     "title": "互換タスク",

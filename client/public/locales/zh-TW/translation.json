@@ -10,7 +10,27 @@
     "queue_status_description": "查看 AI 摘要佇列進度、最近任務結果與失敗資訊。",
     "settings_description": "在統一的後台空間中管理站點行為、整合配置與發佈規則。",
     "title": "後台管理",
-    "writing_description": "在獨立的管理工作區中編寫、編輯並發佈內容。"
+    "writing_description": "在獨立的管理工作區中編寫、編輯並發佈內容。",
+    "posts": {
+      "title": "文章管理",
+      "description": "批次檢視、篩選並刪除站點文章。",
+      "loading": "載入中...",
+      "search_placeholder": "搜尋文章標題 / 內容",
+      "filter_all": "全部",
+      "filter_normal": "已發布",
+      "filter_draft": "草稿",
+      "filter_unlisted": "未發布",
+      "select_all": "全選本頁",
+      "batch_delete": "刪除選中",
+      "delete_selected_confirm": "確定刪除選中的 {{count}} 篇文章嗎？此操作不可撤銷。",
+      "empty": "暫無文章",
+      "selected": "已選 {{count}} 篇",
+      "prev": "上一頁",
+      "next": "下一頁",
+      "partial": "已刪除 {{ok}} 篇，失敗 {{fail}} 篇",
+      "page_info": "第 {{page}} 頁 / 共 {{total}} 篇",
+      "untitled": "未命名文章"
+    }
   },
   "compat_tasks": {
     "title": "相容任務",
