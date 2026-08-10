@@ -313,13 +313,17 @@ export async function uploadImageFile(
   file: File,
   onProgress?: (pct: number) => void,
   signal?: AbortSignal,
+  onCompressedSize?: (size: number) => void,
 ): Promise<UploadedImageResult> {
   const [uploadResult, metadataResult] = await Promise.allSettled([
     // 上传前先压缩（受全局开关控制；非图片/关开关时原样返回）。
     // 元数据仍用原图算，保证占位尺寸与宽高比正确。
-    compressImageFile(file).then((compressed) =>
-      uploadToStorageWithProgress(compressed, compressed.name, onProgress, signal),
-    ),
+    // 压缩完成后立即回调 compressed.size，让上传窗口把「显示大小」更新为
+    // 实际将要传输的压缩后体积（而非原图体积），避免标签 3MB、实则传几百 KB 的误导。
+    compressImageFile(file).then((compressed) => {
+      onCompressedSize?.(compressed.size);
+      return uploadToStorageWithProgress(compressed, compressed.name, onProgress, signal);
+    }),
     generateImageMetadata(file),
   ]);
 

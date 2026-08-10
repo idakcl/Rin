@@ -81,6 +81,13 @@ export function setUploadProgress(id: string, pct: number): void {
   emit();
 }
 
+// 更新某条上传的「显示大小」——压缩完成后把标签从原图体积改成实际将要
+// 传输的压缩后体积，避免悬浮窗显示 3MB、实际只传几百 KB 的误导。
+export function setUploadSize(id: string, size: number): void {
+  items = items.map((it) => (it.id === id ? { ...it, size } : it));
+  emit();
+}
+
 export function setUploadUrl(id: string, url: string): void {
   items = items.map((it) => (it.id === id ? { ...it, url } : it));
   emit();

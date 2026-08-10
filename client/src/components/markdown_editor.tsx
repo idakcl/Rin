@@ -12,7 +12,7 @@ import { isImageCompressEnabled, setImageCompressEnabled } from "../utils/compre
 import { compressImageFile } from "../utils/image-compress";
 import { Markdown } from "./markdown";
 import { mapWithConcurrency } from "../utils/concurrency";
-import { addUpload, setUploadStatus, setUploadProgress, setUploadUrl, registerRetry, registerAbort } from "../utils/upload-progress-store";
+import { addUpload, setUploadStatus, setUploadProgress, setUploadSize, setUploadUrl, registerRetry, registerAbort } from "../utils/upload-progress-store";
 import { isAbortError } from "../utils/upload-with-progress";
 import { acquireWakeLock, releaseWakeLock } from "../utils/wake-lock";
 
@@ -103,7 +103,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
       const controller = new AbortController();
       registerAbort(id, () => controller.abort());
       try {
-        const result = await uploadImageFile(file, (pct) => setUploadProgress(id, pct), controller.signal);
+        const result = await uploadImageFile(file, (pct) => setUploadProgress(id, pct), controller.signal, (size) => setUploadSize(id, size));
         const editorInstance = editorRef.current;
         if (!editorInstance) return;
         const imageText = buildMarkdownImage(file.name, result.url, {
@@ -162,7 +162,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
   const insertMediaSequentially = async (
     files: FileList | File[],
     validate: (file: File) => string | null | Promise<string | null>,
-    produce: (file: File, onProgress: (pct: number) => void, signal: AbortSignal) => Promise<{ snippet: string; url: string }>,
+    produce: (file: File, onProgress: (pct: number) => void, signal: AbortSignal, onCompressedSize?: (size: number) => void) => Promise<{ snippet: string; url: string }>,
     showAlert: (msg: string) => void,
   ) => {
     const editorInstance = editorRef.current;
@@ -194,7 +194,7 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
       registerAbort(id, () => controller.abort());
       try {
         setUploadStatus(id, "uploading");
-        const { snippet, url } = await produce(file, (pct) => setUploadProgress(id, pct), controller.signal);
+        const { snippet, url } = await produce(file, (pct) => setUploadProgress(id, pct), controller.signal, (size) => setUploadSize(id, size));
         if (url) setUploadUrl(id, url);
         setUploadStatus(id, "done");
         return snippet;
@@ -493,10 +493,10 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           }
           return t("upload.unsupported_type");
         },
-        async (file, onProgress, signal) => {
+        async (file, onProgress, signal, onCompressedSize) => {
           // uploadImageFile skips metadata generation for non-images, so it
           // safely uploads videos raw to R2 with no extra processing.
-          const result = await uploadImageFile(file, onProgress, signal);
+          const result = await uploadImageFile(file, onProgress, signal, onCompressedSize);
           if (isImageFile(file)) {
             return {
               snippet: buildMarkdownImage(file.name, result.url, {
@@ -820,9 +820,9 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
                   }
                   return t("upload.unsupported_type");
                 },
-                async (file, onProgress, signal) => {
+                async (file, onProgress, signal, onCompressedSize) => {
                   if (isImageFile(file)) {
-                    const result = await uploadImageFile(file, onProgress, signal);
+                    const result = await uploadImageFile(file, onProgress, signal, onCompressedSize);
                     return {
                       snippet: buildMarkdownImage(file.name, result.url, {
                         blurhash: result.blurhash,
