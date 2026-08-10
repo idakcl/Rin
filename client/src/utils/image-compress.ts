@@ -5,12 +5,10 @@
 // 不做动态质量调节——统一的固定档位既能满足博客展示清晰度，又让体积可控。
 //
 // 设计要点：
-// - 受全局开关 compress-pref 控制（关时直接返回原图，零额外处理）。
+// - 强制开启、忽略开关偏好：任何图片都重编码为 WebP，不再有「关」的路径。
 // - SVG / GIF 跳过（矢量不重编码、动图保留动画）。
 // - 已经很小且不超边长上限的图跳过，避免 WebP 开销导致反而变大。
 // - 压缩后体积没变小也退回原图（安全兜底）。
-
-import { isImageCompressEnabled } from "./compress-pref";
 
 export interface CompressImageOptions {
   // 最长边上限（像素），固定 1920。
@@ -35,8 +33,7 @@ export async function compressImageFile(
   file: File,
   opts: CompressImageOptions = {},
 ): Promise<File> {
-  // 开关关 / 非图片：原样返回
-  if (!isImageCompressEnabled()) return file;
+  // 非图片：原样返回（压缩已强制开启，不再受开关控制）
   if (!isImageFileType(file)) return file;
 
   const lower = (file.name || "").toLowerCase();

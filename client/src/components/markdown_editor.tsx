@@ -8,7 +8,6 @@ import { useAlert } from "./dialog";
 import { useColorMode } from "../utils/darkModeUtils";
 import { buildMarkdownImage, isImageFile, uploadImageFile, DEFAULT_IMAGE_MAX_FILE_SIZE, DEFAULT_VIDEO_MAX_FILE_SIZE, isVideoFile, buildMarkdownVideo, uploadVideoToNetpan, isAudioFile, uploadFileToNetpan, buildMarkdownAudio, buildMarkdownFile, attachVideoPoster } from "../utils/image-upload";
 import { NETPAN_MAX_FILE_SIZE } from "../netpan";
-import { isImageCompressEnabled, setImageCompressEnabled } from "../utils/compress-pref";
 import { compressImageFile } from "../utils/image-compress";
 import { Markdown } from "./markdown";
 import { mapWithConcurrency } from "../utils/concurrency";
@@ -87,7 +86,6 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
   const isComposingRef = useRef(false);
   const [preview, setPreview] = useState<'edit' | 'preview' | 'comparison'>('edit');
   const [uploading, setUploading] = useState(false);
-  const [compressOn, setCompressOn] = useState<boolean>(isImageCompressEnabled());
   const { showAlert, AlertUI } = useAlert();
 
   async function insertImage(
@@ -777,16 +775,6 @@ export function MarkdownEditor({ content, setContent, placeholder = "> Write you
           <UploadVideoButton />
           <UploadMusicButton />
           <UploadFileButton />
-          <MarkdownToolButton
-            label={compressOn ? "图片压缩：开" : "图片压缩：关"}
-            icon="ri-file-zip-line"
-            active={compressOn}
-            onClick={() => {
-              const next = !compressOn;
-              setCompressOn(next);
-              setImageCompressEnabled(next);
-            }}
-          />
         </div>
         {uploading &&
           <div className="flex flex-row items-center space-x-2 px-2">
