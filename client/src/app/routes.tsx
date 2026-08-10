@@ -12,7 +12,7 @@ import useTableOfContents from "../hooks/useTableOfContents";
 import { useSiteConfig } from "../hooks/useSiteConfig";
 import { ErrorPage } from "../page/error";
 import { FeedsPage } from "../page/feeds";
-import { FeedPage, TOCHeader } from "../page/feed";
+import { TOCHeader } from "../page/toc-header";
 
 // 路由级代码分割：除首页 FeedsPage、文章页 FeedPage 外，其余页面按需懒加载，
 // 把 monaco(写作页)、各后台页、timeline/moments 等移出首屏 bundle。
@@ -30,6 +30,11 @@ const SearchPage = lazy(() => import("../page/search").then((m) => ({ default: m
 const Settings = lazy(() => import("../page/settings").then((m) => ({ default: m.Settings })));
 const TimelinePage = lazy(() => import("../page/timeline").then((m) => ({ default: m.TimelinePage })));
 const WritingPage = lazy(() => import("../page/writing").then((m) => ({ default: m.WritingPage })));
+// 文章页 FeedPage 同样改为懒加载：它静态引入 Markdown 组件（react-markdown +
+// remark/rehype 全家桶 + katex + Prism + lightbox），体积占首屏 bundle 的大头。
+// 移出首屏后，markdown 栈仅在打开文章时才按需加载。TOC 不受影响——clean(id)
+// 在 feed 数据异步返回、Markdown 渲染完成后才调用，会触发 TOC 重扫 .toc-content。
+const FeedPage = lazy(() => import("../page/feed").then((m) => ({ default: m.FeedPage })));
 import { ProfileContext } from "../state/profile";
 import { tryInt } from "../utils/int";
 import { useTranslation } from "react-i18next";
