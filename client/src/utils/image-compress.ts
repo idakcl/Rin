@@ -1,7 +1,7 @@
 // 浏览器内图片压缩：把用户选择的图片重编码为 WebP（限制最长边 + 固定降质），
 // 上传前调用，从而大幅减小存储与传输体积、加快页面加载。
 //
-// 固定参数：最长边 1920px + 质量 0.80，输出稳定在「几百 KB」量级。
+// 固定参数：最长边 1920px + 质量 0.5，输出稳定在「几百 KB」量级。
 // 不做动态质量调节——统一的固定档位既能满足博客展示清晰度，又让体积可控。
 //
 // 设计要点：
@@ -15,7 +15,7 @@ import { isImageCompressEnabled } from "./compress-pref";
 export interface CompressImageOptions {
   // 最长边上限（像素），固定 1920。
   maxEdge?: number;
-  // WebP 编码质量 0..1，固定 0.80（输出稳定在几百 KB 量级）。
+  // WebP 编码质量 0..1，固定 0.5（输出稳定在几百 KB 量级）。
   quality?: number;
   // 体积小于等于此值且未超边长上限时跳过压缩，固定 120KB。
   minBytes?: number;
@@ -42,9 +42,9 @@ export async function compressImageFile(
   const lower = (file.name || "").toLowerCase();
   if (lower.endsWith(".svg") || lower.endsWith(".gif")) return file;
 
-  // 固定参数：1920px 长边 + q0.80，输出稳定在几百 KB 量级。
+  // 固定参数：1920px 长边 + q0.5，输出稳定在几百 KB 量级。
   const maxEdge = opts.maxEdge ?? 1920;
-  const quality = opts.quality ?? 0.80;
+  const quality = opts.quality ?? 0.5;
   const minBytes = opts.minBytes ?? 120_000;
 
   let bitmap: ImageBitmap;
