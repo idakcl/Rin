@@ -7,11 +7,15 @@ import { readBootstrappedClientConfig } from "./bootstrap-config";
 
 let bootstrapped = false;
 
-// 语言优先级：用户手动选择(localStorage，由 LanguageDetector 持久化) > 站点默认语言 > zh-CN
+// 仅记录“用户主动选择”的语言，避免被 LanguageDetector 在旧版本中自动缓存的
+// i18nextLng(浏览器探测值，常为 en) 绑架，导致修复后仍显示英文。
+const LANGUAGE_OVERRIDE_KEY = "rin_lang_override";
+
+// 语言优先级：用户主动选择(rin_lang_override) > 站点默认语言 > zh-CN
 // 这样首次访问即跟随站点语言(中文)，用户手动切换后仍能被记住。
 function resolveInitialLanguage(siteLanguage: string): string {
   try {
-    const stored = localStorage.getItem("i18nextLng");
+    const stored = localStorage.getItem(LANGUAGE_OVERRIDE_KEY);
     if (stored && stored.trim().length > 0) {
       return stored.trim();
     }

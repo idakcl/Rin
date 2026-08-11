@@ -132,7 +132,14 @@ export function LanguageSwitch({ className, plain = false, popoverUp = false }: 
           {languages.map(({ code, name }) => (
             <button
               key={code}
-              onClick={() => i18n.changeLanguage(code)}
+              onClick={() => {
+                i18n.changeLanguage(code);
+                try {
+                  localStorage.setItem("rin_lang_override", code);
+                } catch {
+                  // 忽略隐私模式下的写入失败
+                }
+              }}
               className="block w-full rounded-lg px-3 py-2 text-left text-sm t-primary transition-colors hover:bg-black/5 dark:hover:bg-white/10"
             >
               {name}

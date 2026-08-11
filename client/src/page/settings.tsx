@@ -244,6 +244,11 @@ export function Settings() {
             onChange={(value) => {
               setConfigValue("client", "site.language", value);
               i18n.changeLanguage(value);
+              try {
+                localStorage.setItem("rin_lang_override", value);
+              } catch {
+                // 忽略隐私模式下的写入失败
+              }
             }}
           />
 
