@@ -14,7 +14,7 @@ jobs:
         run: |
           echo "ACCOUNT_ID present: ${CLOUDFLARE_ACCOUNT_ID:+yes}${CLOUDFLARE_ACCOUNT_ID:-NO}"
           echo "=== raw response ==="
-          curl -s "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects?per_page=100" \
+          curl -s "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects" \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             -H "Content-Type: application/json" \
             | python3 -c "import sys,json; d=json.load(sys.stdin); print('success:', d.get('success')); print('errors:', d.get('errors')); print('result_len:', len(d.get('result') or [])); [print(' -', p.get('name'), '| domains:', p.get('domains'), '| subdomain:', p.get('subdomain')) for p in (d.get('result') or [])]"
