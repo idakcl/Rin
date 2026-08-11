@@ -1,0 +1,19 @@
+name: List Pages Projects
+
+on:
+  workflow_dispatch:
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    steps:
+      - name: List Cloudflare Pages projects
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "=== Cloudflare Pages projects in this account ==="
+          curl -s "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects?per_page=100" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print('success:', d.get('success')); [print(' -', p.get('name'), '| domains:', p.get('domains'), '| subdomain:', p.get('subdomain')) for p in d.get('result', [])]"
