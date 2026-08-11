@@ -359,49 +359,20 @@ function MarkdownVideo({
   poster?: string;
 }) {
   // 视频地址可能带 #t=0.1 媒体片段（桌面浏览器用它预览首帧），需原样保留给 <video>；
-  // 仅用 parseImageUrlMetadata 解析 poster 里的尺寸/blurhash，用于预留空间与占位。
+  // 仅用 parseImageUrlMetadata 解析 poster 里的尺寸，用于首屏占位比例（缓解 CLS）。
   const posterMeta = poster ? parseImageUrlMetadata(poster) : undefined;
   const posterSrc = posterMeta?.src;
-  // 渐进式还原视频原始比例，消除强制 16:9 带来的黑边（竖屏/横屏皆然）：
-  // - initialRatio：poster 内嵌宽高(或 16:9) 作为首屏占位，预留高度避免 CLS；
-  // - posterRatio：poster 图片 onLoad 后按其自然尺寸设定。微信内置浏览器对
-  //   <video preload="metadata"> 不会自动拉取元数据（onLoadedMetadata 不触发），
-  //   但普通 <img> 正常加载，因此这里能拿到≈视频真实比例，黑边即时消失；
-  // - videoRatio：<video> loadedmetadata 后以视频真实宽高为准，最权威。
-  // 同时容器与 poster 都用 object-contain，保证画面（尤其顶部）始终完整不被裁切。
-  const initialRatio =
-    posterMeta?.width && posterMeta?.height
-      ? `${posterMeta.width} / ${posterMeta.height}`
-      : "16 / 9";
+  // poster 自然尺寸作为首屏占位比例；poster 未就绪时退化为 16:9，仅用于缓解 CLS。
   const [posterRatio, setPosterRatio] = useState<string | null>(null);
-  const [videoRatio, setVideoRatio] = useState<string | null>(null);
-  const ratio = videoRatio ?? posterRatio ?? initialRatio;
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  // 主动触发元数据加载：部分浏览器/微信对 preload="metadata" 不自动拉取，
-  // 用 load() 强制按 metadata 预载，loadedmetadata 后即可拿到真实比例兜底修正。
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    try {
-      v.load();
-    } catch {
-      /* 忽略不支持的调用 */
-    }
-  }, [src]);
-
-  // 比例已知（poster 自然尺寸已加载，或视频元数据已就绪）时用 object-fill：
-  // 此时容器比例已等于视频真实比例，fill 不拉伸变形，且能避开 Android WebView 对
-  // object-contain 的垂直偏移渲染 bug（表现为画面偏下、顶部留一条缝）。
-  // 比例未知（仅 16:9 占位）时退化为 object-contain，避免短暂拉伸变形。
-  const objectFit = videoRatio || posterRatio ? "object-fill" : "object-contain";
+  const placeholderRatio =
+    posterRatio ??
+    (posterMeta?.width && posterMeta?.height
+      ? `${posterMeta.width} / ${posterMeta.height}`
+      : "16 / 9");
 
   return (
-    <div
-      className="relative my-4 w-full overflow-hidden rounded-xl bg-w dark:bg-neutral-800"
-      style={{ aspectRatio: ratio }}
-    >
-      {/* 隐藏的 poster <img>：仅用于读取自然尺寸设定容器比例（消除黑边/CLS），
+    <div className="relative my-4 w-full overflow-hidden rounded-xl bg-w dark:bg-neutral-800">
+      {/* 隐藏的 poster <img>：仅用于读取自然尺寸设定占位比例（缓解 CLS），
           微信内 <img> 正常加载；不可见、不拦截点击，video 自身始终承担显示与交互。 */}
       {posterSrc ? (
         <img
@@ -417,24 +388,18 @@ function MarkdownVideo({
           className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
         />
       ) : null}
-      {/* video 始终可见可交互：controls 常驻显示播放按钮（微信内元数据不加载时
-          也不会因 opacity:0 而丢失按钮）；自身 rounded-xl + 父容器 overflow-hidden
-          保证四角圆角一致。 */}
+      {/* 方案 A：视频自身自然比例撑高度（w-full h-auto），容器跟随视频、无裁切、
+          不再强制容器 aspect-ratio，故微信与 Chrome 垂直对齐一致。style.aspectRatio
+          仅作元数据加载前的占位（避免瞬时 CLS）；视频就绪后其真实比例接管并覆盖之。 */}
       <video
-        ref={videoRef}
         src={src}
         poster={posterSrc}
         controls
         preload="metadata"
         playsInline
         {...X5_VIDEO_ATTRS}
-        onLoadedMetadata={(e) => {
-          const v = e.currentTarget;
-          if (v.videoWidth && v.videoHeight) {
-            setVideoRatio(`${v.videoWidth} / ${v.videoHeight}`);
-          }
-        }}
-        className={`absolute inset-0 h-full w-full bg-black ${objectFit} rounded-xl`}
+        style={{ aspectRatio: placeholderRatio }}
+        className="block w-full h-auto rounded-xl bg-black"
       />
     </div>
   );
