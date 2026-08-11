@@ -6,6 +6,7 @@ import { Button } from "../components/button";
 import { useConfirm } from "../components/dialog";
 import { ImageUploadInput } from "../components/image-upload-input";
 import {
+  SearchableSelect,
   SettingsCard,
   SettingsCardBody,
   SettingsCardHeader,
@@ -100,6 +101,46 @@ export function ItemInput({
             />
           </SettingsCardBody>
         ) : null}
+      </SettingsCard>
+    </div>
+  );
+}
+
+export function ItemSelect({
+  title,
+  description,
+  configKeyTitle,
+  value,
+  options,
+  placeholder,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  configKeyTitle: string;
+  value: string;
+  options: { value: string; label: string }[];
+  placeholder?: string;
+  onChange: (value: string) => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="w-full">
+      <SettingsCard>
+        <SettingsCardRow
+          header={<SettingsCardHeader title={title} description={description} />}
+          action={
+            <SearchableSelect
+              value={value}
+              onChange={onChange}
+              options={options}
+              placeholder={placeholder || configKeyTitle}
+              emptyLabel={t("no_more")}
+              searchable={false}
+            />
+          }
+        />
       </SettingsCard>
     </div>
   );

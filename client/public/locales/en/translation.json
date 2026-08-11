@@ -492,6 +492,11 @@
         "title": "Page Size",
         "desc": "Set the number of articles displayed per page in the list",
         "label": "Articles per page"
+      },
+      "language": {
+        "title": "Default language",
+        "desc": "Set the default display language for the site interface (including the admin panel), applied on a visitor's first visit",
+        "label": "Default language"
       }
     },
     "header_layout": {

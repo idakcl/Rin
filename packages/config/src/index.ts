@@ -18,6 +18,8 @@ export const CLIENT_CONFIG_DEFAULTS = new Map(
     "site.description": "A lightweight personal blogging system",
     "site.avatar": "",
     "site.page_size": 5,
+    // 站点默认界面语言：首次访问且无手动选择时生效（后台与全站界面跟随）
+    "site.language": "zh-CN",
   }),
 );
 

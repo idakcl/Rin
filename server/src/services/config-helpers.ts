@@ -1,5 +1,6 @@
 import {
   AI_CONFIG_KEYS,
+  CLIENT_CONFIG_DEFAULTS,
   CLIENT_CONFIG_ENV_DEFAULTS,
   SENSITIVE_SERVER_CONFIG_FIELDS,
   WEBHOOK_URL_KEY,
@@ -192,6 +193,14 @@ export async function getClientConfigWithDefaults(
 
   if (result["site.page_size"] === undefined || result["site.page_size"] === "") {
     result["site.page_size"] = 5;
+  }
+
+  // 站点默认界面语言：未显式配置时套用 config 包缺省，使首次访问自动跟随站点语言
+  if (result["site.language"] === undefined || result["site.language"] === "") {
+    const defaultLanguage = CLIENT_CONFIG_DEFAULTS.get("site.language");
+    if (typeof defaultLanguage === "string") {
+      result["site.language"] = defaultLanguage;
+    }
   }
 
   return result;

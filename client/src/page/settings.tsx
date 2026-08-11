@@ -20,7 +20,7 @@ import { FEED_LAYOUT_OPTIONS, normalizeFeedLayout } from "../components/feed-lay
 import { useSiteConfig } from "../hooks/useSiteConfig";
 import { applyThemeColor, normalizeThemeColor } from "../utils/theme-color";
 import { AISummarySettings } from "./settings-ai";
-import { ItemButton, ItemImageInput, ItemInput, ItemSwitch, ItemTitle, ItemWithUpload } from "./settings-items";
+import { ItemButton, ItemImageInput, ItemInput, ItemSelect, ItemSwitch, ItemTitle, ItemWithUpload } from "./settings-items";
 import {
   areSettingsDraftsEqual,
   buildAIConfigDraftValue,
@@ -49,8 +49,15 @@ const THEME_COLOR_OPTIONS = [
   { label: "Orange", value: "#ea580c" },
 ];
 
+const SITE_LANGUAGE_OPTIONS = [
+  { value: "zh-CN", label: "简体中文" },
+  { value: "zh-TW", label: "繁體中文" },
+  { value: "en", label: "English" },
+  { value: "ja", label: "日本語" },
+];
+
 export function Settings() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const siteConfig = useSiteConfig();
   const [isOpen, setIsOpen] = useState(false);
   const [msg, setMsg] = useState("");
@@ -225,6 +232,18 @@ export function Settings() {
             placeholder={String(clientConfig.default("site.page_size") ?? t("settings.site.page_size.label"))}
             onChange={(value) => {
               setConfigValue("client", "site.page_size", value);
+            }}
+          />
+          <ItemSelect
+            title={t("settings.site.language.title")}
+            description={t("settings.site.language.desc")}
+            configKeyTitle={t("settings.site.language.label")}
+            value={String(clientConfig.get("site.language") ?? "")}
+            placeholder={String(clientConfig.default("site.language") ?? "zh-CN")}
+            options={SITE_LANGUAGE_OPTIONS}
+            onChange={(value) => {
+              setConfigValue("client", "site.language", value);
+              i18n.changeLanguage(value);
             }}
           />
 
