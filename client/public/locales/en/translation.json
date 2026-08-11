@@ -274,6 +274,10 @@
   "next": "Next Page",
   "no_more": "No More",
   "preview": "Preview",
+  "post": {
+    "previous": "Previous post",
+    "next": "Next post"
+  },
   "previous": "Previous Page",
   "publish": {
     "failed$message": "Failed to publish: {{message}}",

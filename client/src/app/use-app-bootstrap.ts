@@ -56,5 +56,26 @@ export function useAppBootstrap() {
     initializedRef.current = true;
   }, []);
 
+  // 设置保存后（settings.tsx 经由 window.dispatchEvent(new Event("storage")) 通知），
+  // 重新读取 sessionStorage 中的最新客户端配置，使全局 config（以及 useSiteConfig）即时生效，
+  // 无需整页刷新。注意：手动派发的 storage 事件 key 为空，因此这里无条件重读 sessionStorage。
+  // feeds 为无限滚动：page_size 经 useSiteConfig().pageSize 影响每批加载量，limit 变化会触发
+  // useInfiniteFeed 的 loadInitial 重建，从而立即以新批次规模重置列表。
+  useEffect(() => {
+    const handleStorage = () => {
+      try {
+        const cached = sessionStorage.getItem("config");
+        if (!cached) return;
+        const configObject = JSON.parse(cached) as Record<string, unknown>;
+        setConfig(new ConfigWrapper(configObject, defaultClientConfig));
+        applyThemeColor(typeof configObject["theme.color"] === "string" ? configObject["theme.color"] : undefined);
+      } catch {
+        // 解析失败时保持现状
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
   return { config, profile };
 }

@@ -34,7 +34,7 @@ export function AdjacentCard({data, type}: { data: AdjacentFeed | null | undefin
     if (!data) {
         return (<div className="w-full p-6 duration-300">
             <p className={`t-secondary w-full ${direction}`}>
-                {t(type === "previous" ? "previous" : "next")}
+                {t(type === "previous" ? "post.previous" : "post.next")}
             </p>
             <h1 className={`text-xl text-gray-700 dark:text-white text-pretty truncate ${direction}`}>
                 {t('no_more')}
@@ -45,7 +45,7 @@ export function AdjacentCard({data, type}: { data: AdjacentFeed | null | undefin
         <Link href={`/feed/${((data as any).alias || data.id)}`} target="_blank"
               className={`w-full p-6 duration-300 bg-button ${radius}`}>
             <p className={`t-secondary w-full ${direction}`}>
-                {t(type === "previous" ? "previous" : "next")}
+                {t(type === "previous" ? "post.previous" : "post.next")}
             </p>
             <h1 className={`text-xl font-bold text-gray-700 dark:text-white text-pretty truncate ${direction}`}>
                 {data.title}

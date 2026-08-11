@@ -265,6 +265,10 @@
   "next": "次のページ",
   "no_more": "もうない",
   "preview": "プレビュー",
+  "post": {
+    "previous": "前の記事",
+    "next": "次の記事"
+  },
   "previous": "前のページ",
   "publish": {
     "failed$message": "公開に失敗しました: {{message}}",
