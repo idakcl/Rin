@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef } from "react"
+import { useContext, useEffect, useRef, useState } from "react"
 import { Helmet } from 'react-helmet'
 import { Link, useSearch } from "wouter"
 import { FeedCard } from "../components/feed_card"
@@ -9,7 +9,25 @@ import { useSiteConfig } from "../hooks/useSiteConfig";
 import { siteName } from "../utils/constants"
 import { tryInt } from "../utils/int"
 import { useTranslation } from "react-i18next";
-import { useInfiniteFeed, type FeedType } from "../hooks/useInfiniteFeed";
+import { client } from "../app/runtime"
+
+type FeedType = "draft" | "unlisted" | "normal"
+
+type FeedsData = {
+    size: number,
+    data: any[],
+    hasNext: boolean
+}
+
+/** 计算分页器的页码窗口（最多围绕当前页展示 5 个页码） */
+function getPageWindow(current: number, total: number): number[] {
+    const delta = 2
+    const start = Math.max(1, current - delta)
+    const end = Math.min(total, current + delta)
+    const range: number[] = []
+    for (let i = start; i <= end; i++) range.push(i)
+    return range
+}
 
 export function FeedsPage() {
     const { t } = useTranslation()
@@ -18,78 +36,48 @@ export function FeedsPage() {
     const profile = useContext(ProfileContext);
     const type = ((query.get("type") as FeedType) || 'normal')
     const limit = tryInt(siteConfig.pageSize, query.get("limit"))
-    const feedListClass = siteConfig.feedLayout === "masonry" ? "wauto columns-1 gap-5 ani-show md:columns-2" : "wauto flex flex-col ani-show";
-    const {
-        items,
-        hasNext,
-        loading,
-        total,
-        loadInitial,
-        loadNext,
-        MAX_DEEPLINK_PAGES,
-    } = useInfiniteFeed(type, limit)
+    const page = Math.max(1, tryInt(1, query.get("page")))
+    const feedListClass = siteConfig.feedLayout === "masonry" ? "wauto columns-1 gap-5 md:columns-2" : "wauto flex flex-col ani-show";
 
-    // 镜像最新 hasNext，供 fillShortPage 判定终止（避免哨兵常驻视口时死循环）
-    const hasNextRef = useRef(hasNext)
-    hasNextRef.current = hasNext
+    const [status, setStatus] = useState<'loading' | 'idle'>('idle')
+    const [feeds, setFeeds] = useState<FeedsData>()
+    const ref = useRef("")
 
-    const sentinelRef = useRef<HTMLDivElement>(null)
-    // 永远指向最新的 loadNext，避免 IntersectionObserver 回调捕获到旧的闭包
-    const loadNextRef = useRef(loadNext)
-    loadNextRef.current = loadNext
-
-    // 初始加载 + 切换 type/limit 时重置重载
-    useEffect(() => {
-        let cancelled = false
-        const page = tryInt(1, query.get("page"))
-        loadInitial().then(() => {
-            if (cancelled) return
-            // 普通首页（?page 缺省或 =1）不滚动，保持顶部；仅深链 ?page=N (N>1) 才预热后滚到底部
-            if (page <= 1) return
-            // 深链 ?page=N：串行预热到该页（上限 MAX_DEEPLINK_PAGES），再粗略定位到底部
-            const target = Math.min(page, MAX_DEEPLINK_PAGES)
-            let chain: Promise<unknown> = Promise.resolve()
-            for (let i = 2; i <= target; i++) {
-                chain = chain.then(() => loadNext())
-            }
-            chain.then(() => {
-                if (cancelled) return
-                requestAnimationFrame(() => {
-                    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" })
-                })
+    function fetchFeeds() {
+        client.feed.list({ page, limit, type })
+            .then(({ data }) => {
+                if (data) {
+                    setFeeds(data)
+                }
+                setStatus('idle')
             })
-        })
-        return () => { cancelled = true }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [loadInitial, query.get("page")])
+            .catch(() => {
+                setStatus('idle')
+            })
+    }
 
-    // 抖音式：底部哨兵观察 + 短首屏级联。
-    // 注意：外层 <Waiting> 在 loading 翻转时会重挂载哨兵（旧节点卸载、新节点挂载），
-    // 因此 observer 绝不能只观察一次（deps:[] 会盯着已卸载的旧节点，导致真实哨兵永远不触发——
-    // 无限滚动在长页面上其实也一直是坏的）。这里依赖 loading，哨兵重挂载后重新观察。
     useEffect(() => {
-        const el = sentinelRef.current
-        if (!el || typeof IntersectionObserver === "undefined") return
-        const obs = new IntersectionObserver(
-            (entries) => {
-                if (entries.some((e) => e.isIntersecting)) loadNextRef.current()
-            },
-            { rootMargin: "800px 0px" }
-        )
-        obs.observe(el)
-        // 短首屏：哨兵已在「视口 + 800px 预触发区」内（页面矮到滚不动），主动级联 loadNext，
-        // 直到页面变高可滚动（交给 observer）或 hasNext=false。用 rAF 确保哨兵已挂载、ref 有效。
-        const fill = () => {
-            if (!hasNextRef.current) return
-            const rect = el.getBoundingClientRect()
-            if (rect.top <= window.innerHeight + 800) {
-                loadNext().then(() => requestAnimationFrame(fill))
-            }
-        }
-        requestAnimationFrame(fill)
-        return () => obs.disconnect()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [loading])
+        const key = `${page} ${limit} ${type}`
+        if (ref.current === key) return
+        setStatus('loading')
+        fetchFeeds()
+        ref.current = key
+        // 切页后回到顶部（ScrollToTop 只在 pathname 变化时滚顶，query 变化不触发）
+        window.scrollTo({ top: 0, behavior: "auto" })
+    }, [page, limit, type])
+
+    const feedData = Array.isArray(feeds?.data) ? feeds.data : [];
+    const total = feeds?.size ?? 0
+    const totalPages = Math.max(1, Math.ceil(total / limit))
+    const hasNext = Boolean(feeds?.hasNext)
+
+    function pageHref(target: number) {
+        const params = new URLSearchParams(query)
+        params.set("page", String(target))
+        return `?${params.toString()}`
+    }
+
+    const pageNumbers = getPageWindow(page, totalPages)
 
     return (
         <>
@@ -101,7 +89,7 @@ export function FeedsPage() {
                 <meta property="og:type" content="article" />
                 <meta property="og:url" content={document.URL} />
             </Helmet>
-            <Waiting for={!loading || items.length > 0}>
+            <Waiting for={status === 'idle'}>
                 <main className="w-full flex flex-col justify-center items-center mb-8">
                     <div className="wauto text-start text-black dark:text-white py-4 text-4xl font-bold">
                         <p>
@@ -124,31 +112,29 @@ export function FeedsPage() {
                         </div>
                     </div>
                     <div className={feedListClass}>
-                        {items.map(({ id, ...feed }: any) => (
+                        {feedData.map(({ id, ...feed }: any) => (
                             <FeedCard key={id} id={id} {...feed} />
                         ))}
                     </div>
-                    <div className="wauto flex flex-col items-center mt-4 ani-show">
-                        {/* 哨兵：进入视口附近即触发 loadNext */}
-                        <div ref={sentinelRef} className="h-10 w-full" aria-hidden="true" />
-                        {loading && (
-                            <span className="text-sm text-neutral-500 font-normal py-2">
-                                {t('loading')}
-                            </span>
-                        )}
-                        {!hasNext && items.length > 0 && (
-                            <div className="text-gray-500 pt-6">{t('no_more')}</div>
-                        )}
-                        {/* 不支持 IntersectionObserver 时的兜底：手动加载更多 */}
-                        {hasNext && typeof IntersectionObserver === "undefined" && (
-                            <button
-                                onClick={() => loadNext()}
-                                className="text-sm font-normal rounded-full px-4 py-2 text-white bg-theme mt-2"
-                            >
-                                {t('load_more')}
-                            </button>
-                        )}
-                    </div>
+                    {totalPages > 1 && (
+                        <div className="wauto flex flex-wrap items-center justify-center gap-2 mt-6 ani-show">
+                            {page > 1 && (
+                                <Link href={pageHref(page - 1)} className="text-sm font-normal rounded-full px-4 py-2 text-white bg-theme">
+                                    {t('previous')}
+                                </Link>
+                            )}
+                            {pageNumbers.map((p) => (
+                                <Link key={p} href={pageHref(p)} className={`text-sm font-normal rounded-full px-4 py-2 ${p === page ? "bg-theme text-white" : "bg-w text-theme border border-black/10 dark:border-white/10"}`}>
+                                    {p}
+                                </Link>
+                            ))}
+                            {hasNext && (
+                                <Link href={pageHref(page + 1)} className="text-sm font-normal rounded-full px-4 py-2 text-white bg-theme">
+                                    {t('next')}
+                                </Link>
+                            )}
+                        </div>
+                    )}
                 </main>
             </Waiting>
         </>
