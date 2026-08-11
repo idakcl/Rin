@@ -5,13 +5,14 @@ import { useAlert, useConfirm } from "../components/dialog";
 import { parseImageUrlMetadata } from "../utils/image-upload";
 import { useTranslation } from "react-i18next";
 import type { FeedListResponse } from "@rin/api";
+import { useSiteConfig } from "../hooks/useSiteConfig";
 
 // 列表项类型（后端 FeedListResponse.data 未声明 alias，这里补一个可选别名用于构造链接）。
 type ManagePost = FeedListResponse["data"][number] & { alias?: string | null };
 
 type FilterType = "all" | "normal" | "draft" | "unlisted";
 
-const LIMIT = 20;
+// 每页数量跟随全局「分页大小」设置（site.page_size），不再硬编码固定值。
 
 // 拉取一页文章：keyword 非空走搜索，否则走列表（可带 type 状态筛选）。
 // 模块级纯函数，避免副作用闭包导致的 lint 依赖告警；错误以返回值带回，由调用处提示。
@@ -19,8 +20,9 @@ async function fetchPosts(
   page: number,
   filter: FilterType,
   keyword: string,
+  limit: number,
 ): Promise<{ items: ManagePost[]; total: number; hasNext: boolean; error?: string } | null> {
-  const params = { page, limit: LIMIT };
+  const params = { page, limit };
   const req = keyword.trim()
     ? client.search.search(keyword.trim(), params)
     : client.feed.list({ ...params, type: filter === "all" ? undefined : filter });
@@ -32,12 +34,15 @@ async function fetchPosts(
     return { items: [], total: 0, hasNext: false };
   }
   // 后端用 limit+1 探测下一页，hasNext 为真时 data 会多带一条探测项，需截掉。
-  const items = (data.hasNext ? data.data.slice(0, LIMIT) : data.data) as ManagePost[];
+  const items = (data.hasNext ? data.data.slice(0, limit) : data.data) as ManagePost[];
   return { items, total: data.size, hasNext: data.hasNext };
 }
 
 export function PostsManagePage() {
   const { t } = useTranslation();
+  const siteConfig = useSiteConfig();
+  // 每页数量跟随全局「分页大小」设置；限制在 [1,100] 防止异常值拖垮加载。
+  const limit = Math.min(100, Math.max(1, siteConfig.pageSize || 20));
   const { showAlert, AlertUI } = useAlert();
   const { showConfirm, ConfirmUI } = useConfirm();
 
@@ -53,7 +58,7 @@ export function PostsManagePage() {
 
   const run = async (p: number, f: FilterType, kw: string) => {
     setLoading(true);
-    const r = await fetchPosts(p, f, kw);
+    const r = await fetchPosts(p, f, kw, limit);
     setLoading(false);
     if (r?.error) {
       showAlert(r.error);
@@ -69,7 +74,7 @@ export function PostsManagePage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const r = await fetchPosts(1, "all", "");
+      const r = await fetchPosts(1, "all", "", limit);
       if (cancelled) return;
       setLoading(false);
       if (r?.error) showAlert(r.error);

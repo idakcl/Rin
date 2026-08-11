@@ -155,7 +155,7 @@ export function FeedsPage() {
                                 placeholder={t('page_goto')}
                                 className="w-20 text-sm rounded-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 bg-transparent text-black dark:text-white outline-none focus:border-theme"
                             />
-                            <button type="submit" className="text-sm font-normal rounded-full px-4 py-2 text-white bg-theme">
+                            <button type="submit" className="text-sm font-normal rounded-full px-4 py-2 text-neutral-500 hover:text-theme">
                                 {t('page_goto')}
                             </button>
                         </form>
