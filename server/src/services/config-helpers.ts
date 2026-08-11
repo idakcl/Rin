@@ -191,7 +191,10 @@ export async function getClientConfigWithDefaults(
     }
   }
 
-  if (result["site.page_size"] === undefined || result["site.page_size"] === "") {
+  // 仅当“完全未配置”(undefined) 时回退 5 作为缺省；不再把空字符串强制回填为 5。
+  // 否则用户在设置页清空/修改分页大小时，空值会被服务端填回 5，
+  // 造成“删掉 5 又自动弹出 5、无法改成其它值”的现象。
+  if (result["site.page_size"] === undefined) {
     result["site.page_size"] = 5;
   }
 
