@@ -253,17 +253,11 @@ jobs:
           echo "Resolved deployment URL: ${URL}"
           echo "url=${URL}" >> $GITHUB_OUTPUT
 
-      - name: Deploy client (SPA) to Cloudflare Pages
-        # 自定义域名 rinx.hello.nyc.mn 由独立的 Cloudflare Pages 项目（rinx-server）托管 SPA，
-        # 而上面的 wrangler deploy 只更新 rin-server worker（API + worker.dev）。
-        # 不部署这一步，自定义域名会一直停留在旧构建。这里补齐 Pages 部署。
-        if: needs.prepare.outputs.is_production == 'true'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          echo "Deploying client (SPA) to Cloudflare Pages project: rinx-server ..."
-          bun x wrangler pages deploy dist/client --project-name rinx-server
+      # 注意：SPA（dist/client）已由上面的 `bun run deploy` 经 wrangler.toml 的
+      # [assets] directory=./dist/client 一并部署到生产 worker（默认 rin-server，
+      # 自定义域名 rinx.hello.nyc.mn 即挂在此 worker 上）。不存在独立的 Cloudflare
+      # Pages 项目，故不要再补 wrangler pages deploy，否则 Deploy 会因 Project not
+      # found 而失败。旧的 HTML 外壳若被边缘缓存，靠下面的 Purge 步骤（或手动清缓存）刷新。
 
       - name: Purge Cloudflare edge cache (production)
         # 服务端注入的 OG/Twitter 卡片依赖 Worker 动态改写 HTML <head>；若边缘缓存了
