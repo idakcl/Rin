@@ -8,11 +8,21 @@ export default defineConfig(({ mode }) => {
   const serverPort = Number(process.env.RIN_SERVER_PORT || "11499");
   const serverTarget = `http://127.0.0.1:${serverPort}`;
   const cacheDir = process.env.RIN_VITE_CACHE_DIR || "../.vite/client";
-  
+
+  // Build-time version string baked into the client bundle. Used to cache-bust
+  // locale JSON files (served with `cache-control: immutable` via the worker's
+  // [assets] config) so that newly added translation keys are re-fetched by
+  // browsers that cached an older, key-missing locale. Defaults to the build
+  // timestamp so every deploy produces a distinct URL and defeats stale caches.
+  const buildVersion = process.env.RIN_BUILD_VERSION || String(Date.now());
+
   return {
     cacheDir,
-    // Note: Client configuration is fetched from server at runtime
-    // No environment variables are injected at build time
+    // Note: Client configuration is fetched from server at runtime.
+    // Only the build version (for locale cache-busting) is injected here.
+    define: {
+      __RIN_BUILD_VERSION__: JSON.stringify(buildVersion),
+    },
     build: {
       outDir: '../dist/client',
       emptyOutDir: true,
