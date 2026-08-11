@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { timeago } from "../utils/timeago";
 import { HashTag } from "./hashtag";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { drawBlurhashToCanvas } from "../utils/blurhash";
 import { parseImageUrlMetadata } from "../utils/image-upload";
 import { useImageLoadState } from "../utils/use-image-load-state";
@@ -13,11 +13,14 @@ function FeedCardImage({ src, variant }: { src: string; variant: FeedCardVariant
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const { src: cleanSrc, blurhash, width, height } = parseImageUrlMetadata(src);
     const { failed, imageRef, loaded, onError, onLoad } = useImageLoadState(cleanSrc);
-    const aspectRatio = width && height ? `${width} / ${height}` : "16 / 9";
+    // 优先使用 URL 中的宽高元数据；无元数据时，等图片加载后按真实宽高比更新，
+    // 使「框比 = 图比」，封面图始终完整居中、不裁切、不留白。
+    const [naturalRatio, setNaturalRatio] = useState<string | null>(null);
+    const aspectRatio = width && height ? `${width} / ${height}` : naturalRatio ?? "16 / 9";
     const imageFrameClass =
         variant === "editorial"
-            ? "relative flex max-h-80 w-full flex-row items-center overflow-hidden rounded-[20px]"
-            : "relative mb-2 flex max-h-80 w-full flex-row items-center overflow-hidden rounded-xl";
+            ? "relative w-full overflow-hidden rounded-[20px] bg-neutral-100 dark:bg-neutral-800"
+            : "relative mb-2 w-full overflow-hidden rounded-xl bg-neutral-100 dark:bg-neutral-800";
 
     useEffect(() => {
         if (!blurhash || !canvasRef.current) {
@@ -29,6 +32,14 @@ function FeedCardImage({ src, variant }: { src: string; variant: FeedCardVariant
             console.error("Failed to render blurhash", error);
         }
     }, [blurhash]);
+
+    const handleLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+        const el = event.currentTarget;
+        if (el.naturalWidth && el.naturalHeight) {
+            setNaturalRatio(`${el.naturalWidth} / ${el.naturalHeight}`);
+        }
+        onLoad();
+    };
 
     return (
         <div
@@ -48,9 +59,9 @@ function FeedCardImage({ src, variant }: { src: string; variant: FeedCardVariant
                 alt=""
                 width={width}
                 height={height}
-                onLoad={onLoad}
+                onLoad={handleLoad}
                 onError={onError}
-                className={`absolute inset-0 h-full w-full object-cover object-center hover:scale-105 translation duration-300 ${blurhash && (!loaded || failed) ? "opacity-0" : "opacity-100"
+                className={`absolute inset-0 block h-full w-full object-cover object-center transition-opacity duration-300 hover:scale-105 ${blurhash && (!loaded || failed) ? "opacity-0" : "opacity-100"
                     }`}
             />
         </div>
