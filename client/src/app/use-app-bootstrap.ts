@@ -59,8 +59,8 @@ export function useAppBootstrap() {
   // 设置保存后（settings.tsx 经由 window.dispatchEvent(new Event("storage")) 通知），
   // 重新读取 sessionStorage 中的最新客户端配置，使全局 config（以及 useSiteConfig）即时生效，
   // 无需整页刷新。注意：手动派发的 storage 事件 key 为空，因此这里无条件重读 sessionStorage。
-  // feeds 为传统分页：page_size 经 useSiteConfig().pageSize 作为每页条数，保存设置后
-  // feeds.tsx 用新的 limit 重新按 ?page 拉取对应页，列表即时按新每页数量分页。
+  // feeds 为无限滚动：page_size 经 useSiteConfig().pageSize 影响每批加载量，limit 变化会触发
+  // useInfiniteFeed 的 loadInitial 重建，从而立即以新批次规模重置列表。
   useEffect(() => {
     const handleStorage = () => {
       try {
