@@ -228,7 +228,7 @@ export function Settings() {
             title={t("settings.site.page_size.title")}
             description={t("settings.site.page_size.desc")}
             configKeyTitle={t("settings.site.page_size.label")}
-            value={String(clientConfig.get("site.page_size") ?? "")}
+            value={String(draft.clientConfig["site.page_size"] ?? "")}
             placeholder={String(clientConfig.default("site.page_size") ?? t("settings.site.page_size.label"))}
             onChange={(value) => {
               setConfigValue("client", "site.page_size", value);
