@@ -279,6 +279,10 @@
     "next": "Next post"
   },
   "previous": "Previous Page",
+  "first": "First Page",
+  "last": "Last Page",
+  "page_current": "Page {{page}} / {{total}}",
+  "page_goto": "Go",
   "publish": {
     "failed$message": "Failed to publish: {{message}}",
     "success": "Publish successful",

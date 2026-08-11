@@ -328,12 +328,12 @@ function MarkdownImage({
         width={width}
         height={height}
         decoding="async"
-        onClick={() => {
+        onDoubleClick={() => {
           show(cleanSrc);
         }}
         onLoad={handleLoad}
         onError={handleError}
-        className={`mx-auto max-w-full cursor-zoom-in transition-opacity duration-300 ${roundedClass} ${
+        className={`mx-auto max-w-full cursor-pointer transition-opacity duration-300 ${roundedClass} ${
           className || ""
         } ${showPlaceholder ? "opacity-0" : "opacity-100"}`}
       />

@@ -279,6 +279,10 @@
     "next": "下一篇"
   },
   "previous": "上一页",
+  "first": "首页",
+  "last": "末页",
+  "page_current": "第 {{page}} / {{total}} 页",
+  "page_goto": "跳转",
   "publish": {
     "failed$message": "发布失败: {{message}}",
     "success": "发布成功",

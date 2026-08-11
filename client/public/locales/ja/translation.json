@@ -270,6 +270,10 @@
     "next": "次の記事"
   },
   "previous": "前のページ",
+  "first": "最初のページ",
+  "last": "最後のページ",
+  "page_current": "{{page}} / {{total}} ページ",
+  "page_goto": "移動",
   "publish": {
     "failed$message": "公開に失敗しました: {{message}}",
     "success": "公開に成功しました",
