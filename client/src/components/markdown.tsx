@@ -1,5 +1,6 @@
 import "katex/dist/katex.min.css";
 import React, { cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { AudioPlayer } from "./audio-player";
