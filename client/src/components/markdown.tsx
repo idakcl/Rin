@@ -18,7 +18,6 @@ import remarkBreaks from "remark-breaks";
 import Lightbox, { SlideImage } from "yet-another-react-lightbox";
 import Counter from "yet-another-react-lightbox/plugins/counter";
 import Download from "yet-another-react-lightbox/plugins/download";
-import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import "yet-another-react-lightbox/styles.css";
 import { drawBlurhashToCanvas } from "../utils/blurhash";
 import { useColorMode } from "../utils/darkModeUtils";
@@ -797,11 +796,18 @@ export function Markdown({ content }: { content: string }) {
     <>
       {Content}
       <Lightbox
-        plugins={[Download, Zoom, Counter]}
+        plugins={[Download, Counter]}
         index={index}
         slides={slides.current}
         open={index >= 0}
         close={() => setIndex(-1)}
+        on={{
+          // 点击灯箱图片本身即关闭（退回文章）。库的 click 回调在 slide 被点击时触发
+          // （含图片与背景，工具栏按钮已 stopPropagation 不冒泡到此），故直接关闭。
+          click: () => {
+            setIndex(-1);
+          },
+        }}
         render={{
           // 右上角显式渲染一个清晰的关闭按钮（深色圆底 + 白色叉），
           // 替换库默认的弱提示关闭图标，确保一眼可见、点击区域够大。
