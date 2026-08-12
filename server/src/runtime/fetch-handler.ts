@@ -1,6 +1,7 @@
 import { getApp } from "./app-instance";
 import { extractImageWithMetadata } from "../utils/image";
 import { stripMarkdown } from "../utils/markdown";
+import { encodeOgImageSrc, OG_IMAGE_ALLOWED_HOSTS } from "../services/og-image";
 
 const ROOT_FEED_PATTERN = /^\/(rss\.xml|atom\.xml|rss\.json|feed\.json|feed\.xml)$/;
 const APP_PUBLIC_ROUTE_PATTERN = /^\/(favicon|favicon\.ico)(?:\/|$)/;
@@ -107,24 +108,6 @@ function safeUrl(u: string | undefined): string | undefined {
   }
 }
 
-// 仅保留"已同源图直接用、跨域图返回 undefined"的判定；跨域图不再代理，
-// 由调用方回退到同源静态 default-og.jpg——微信爬虫对带 query 的代理 URL 抓取不稳/易超时。
-function toSameOriginOgImage(request: Request, image: string | undefined): string | undefined {
-  if (!image) return undefined;
-  let u: URL;
-  try {
-    u = new URL(image);
-  } catch {
-    return image;
-  }
-  if (u.protocol !== "http:" && u.protocol !== "https:") return image;
-  const reqHost = new URL(request.url).host;
-  if (u.host === reqHost) return image; // 已同源，无需代理
-  // 跨域图(如 netpan)不再走 /api/og-image 代理：微信爬虫对带 query 参数的代理 URL
-  // 抓取不稳/易超时，故直接返回 undefined，由调用方回退到同源静态 default-og.jpg。
-  return undefined;
-}
-
 // 站点级卡片(首页/标签页/关于等非文章页)的头像解析：
 // - 相对路径(如 /api/blob/images/xxx)按当前站点 origin 补全为同源绝对 URL；
 // - 仅同源头像可被微信爬虫稳定抓取：跨域头像(如 netpan)抓取不稳，返回 undefined，
@@ -221,16 +204,28 @@ async function getArticleOg(request: Request, env: Env, id: string): Promise<OgD
         raw.startsWith("http://") || raw.startsWith("https://")
           ? raw
           : new URL(raw, base).toString();
-      image = toSameOriginOgImage(request, safeUrl(abs) ?? safeUrl(raw));
+      const safe = safeUrl(abs) ?? safeUrl(raw);
+      if (safe) {
+        const reqHost = new URL(request.url).host;
+        const u = new URL(safe);
+        if (u.host === reqHost) {
+          // 已同源(站点主域 /api/blob/images/...)，直链最稳
+          image = safe;
+        } else if (OG_IMAGE_ALLOWED_HOSTS.includes(u.host)) {
+          // 跨域白名单图床(如 netpan)：不能直接给微信爬虫(跨域抓取不稳/易超时)，
+          // 改为同源路径式代理 /og-image/<base64url>，卡片才能稳定抓到文章首图。
+          image = `${base}/og-image/${encodeOgImageSrc(safe)}`;
+        }
+        // 其它跨域图：image 保持 undefined，最终回退 default-og.jpg
+      }
     }
     // 站点名取自后台实时配置(与站点卡片一致)，env 仅作兜底
     const liveSite = await fetchLiveSiteConfig(request, env);
     const ev = env as unknown as Record<string, any>;
     const siteName = liveSite.name || (typeof ev?.NAME === "string" ? ev.NAME : "");
-    // og:image 同源直链优先：文章首图若已是站点主域图(/api/blob/images/...)直接用；
-    // 否则（跨域 netpan 等）回退到同源静态 default-og.jpg，避免走 /api/og-image 代理
-    // 多一跳回源——微信爬虫对带 query 参数的代理 URL 抓取不稳/易超时，直链最稳。
-    const ogImage = image && image.startsWith(origin) ? image : `${origin}/default-og.jpg`;
+    // og:image：文章首图(同源直链 / 跨域走同源代理)优先；都不可用才回退品牌渐变 default-og.jpg。
+    // 微信/Twitter 卡片渲染要求显式尺寸与 MIME，缺这些元标签时微信会跳过缩略图只渲染纯文本卡片。
+    const ogImage = image || `${origin}/default-og.jpg`;
     return {
       type: "article",
       title: escapeHtmlAttr(title),
@@ -321,6 +316,13 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
   }
 
   if (isAppPublicRoute(pathname)) {
+    return getApp().fetch(request, env);
+  }
+
+  // 同源 OG 图代理 /og-image/<base64url>：文章首图若为跨域图床(如 netpan)，经此同源
+  // 暴露给微信等爬虫，卡片才能稳定抓取缩略图。必须路由给 Hono(代理服务挂在其上)，
+  // 否则会落到下方 serveSpaEntry 被当成 SPA 空壳返回，代理永远不生效。
+  if (pathname.startsWith("/og-image")) {
     return getApp().fetch(request, env);
   }
 
