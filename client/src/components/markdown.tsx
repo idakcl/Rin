@@ -397,7 +397,10 @@ function MarkdownVideo({
       ) : null}
       {/* 方案 A：视频自身自然比例撑高度（w-full h-auto），容器跟随视频、无裁切、
           不再强制容器 aspect-ratio，故微信与 Chrome 垂直对齐一致。style.aspectRatio
-          仅作元数据加载前的占位（避免瞬时 CLS）；视频就绪后其真实比例覆盖。 */}
+          仅作元数据加载前的占位（避免瞬时 CLS）；视频就绪后其真实比例覆盖。
+          object-fill = object-fit: fill：强制视频帧拉伸填满盒子，部分浏览器（微信 X5）
+          默认会把帧缩进盒子保持比例导致上下黑边，此处显式覆盖为 fill；因 aspectRatio
+          已对齐视频真实比例，正常情况下无形变，仅元数据未就绪的瞬时有极轻微形变。 */}
       <video
         src={src}
         poster={posterSrc}
@@ -412,7 +415,7 @@ function MarkdownVideo({
           }
         }}
         style={{ aspectRatio: placeholderRatio }}
-        className="block w-full h-auto bg-black"
+        className="block w-full h-auto bg-black object-fill"
       />
     </div>
   );
