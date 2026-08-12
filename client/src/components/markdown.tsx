@@ -362,9 +362,14 @@ function MarkdownVideo({
   // 仅用 parseImageUrlMetadata 解析 poster 里的尺寸，用于首屏占位比例（缓解 CLS）。
   const posterMeta = poster ? parseImageUrlMetadata(poster) : undefined;
   const posterSrc = posterMeta?.src;
-  // poster 自然尺寸作为首屏占位比例；poster 未就绪时退化为 16:9，仅用于缓解 CLS。
+  // 视频元素 aspect-ratio 占位的优先级：视频真实比例 > 海报自然尺寸 > 海报内嵌尺寸 > 16:9。
+  // 关键修复：必须用视频真实比例（videoRatio）覆盖，否则 placeholderRatio（海报/16:9）
+  // 与视频真实宽高比不一致时，video 元素盒模型比例 ≠ 视频帧比例，object-fit:contain
+  // 会把视频帧缩进盒子里、上下露黑（与容器 bg-neutral-800 融合即"上下缝"）。
   const [posterRatio, setPosterRatio] = useState<string | null>(null);
+  const [videoRatio, setVideoRatio] = useState<string | null>(null);
   const placeholderRatio =
+    videoRatio ??
     posterRatio ??
     (posterMeta?.width && posterMeta?.height
       ? `${posterMeta.width} / ${posterMeta.height}`
@@ -390,7 +395,7 @@ function MarkdownVideo({
       ) : null}
       {/* 方案 A：视频自身自然比例撑高度（w-full h-auto），容器跟随视频、无裁切、
           不再强制容器 aspect-ratio，故微信与 Chrome 垂直对齐一致。style.aspectRatio
-          仅作元数据加载前的占位（避免瞬时 CLS）；视频就绪后其真实比例接管并覆盖之。 */}
+          仅作元数据加载前的占位（避免瞬时 CLS）；视频就绪后其真实比例覆盖。 */}
       <video
         src={src}
         poster={posterSrc}
@@ -398,6 +403,12 @@ function MarkdownVideo({
         preload="metadata"
         playsInline
         {...X5_VIDEO_ATTRS}
+        onLoadedMetadata={(e) => {
+          const v = e.currentTarget;
+          if (v.videoWidth && v.videoHeight) {
+            setVideoRatio(`${v.videoWidth} / ${v.videoHeight}`);
+          }
+        }}
         style={{ aspectRatio: placeholderRatio }}
         className="block w-full h-auto rounded-xl bg-black"
       />
