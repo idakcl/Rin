@@ -10,10 +10,12 @@ import { RSSService } from "../services/rss";
 import { BlobService, StorageService } from "../services/storage";
 import { TagService } from "../services/tag";
 import { UserService } from "../services/user";
+import { OgImageService } from "../services/og-image";
 
 export function registerRoutes(app: RinApp) {
   app.get("/", (c) => c.text("Hi"));
 
+  app.route("/og-image", OgImageService());
   app.route("/feed", FeedService());
   app.route("/search", SearchService());
   app.route("/wp", WordPressService());

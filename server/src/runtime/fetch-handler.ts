@@ -104,6 +104,27 @@ function safeUrl(u: string | undefined): string | undefined {
   }
 }
 
+// 将跨域图片改写为同源 /api/og-image 代理 URL，提升社交爬虫抓取缩略图成功率。
+// 微信等平台的默认分享卡片对"跨域 / 非常见 TLD"的 og:image 抓取极不稳定，常拉不到
+// 缩略图；改为同源 URL 后，爬虫从站点主域直接取图，卡片(标题+描述+缩略图)稳定显示。
+// 同源图与白名单外主机保持原样(不代理)，避免开放代理与破坏既有行为。
+const OG_IMAGE_PROXY_HOSTS = ["netpan.1234.nyc.mn"];
+function toSameOriginOgImage(request: Request, image: string | undefined): string | undefined {
+  if (!image) return undefined;
+  let u: URL;
+  try {
+    u = new URL(image);
+  } catch {
+    return image;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return image;
+  const reqHost = new URL(request.url).host;
+  if (u.host === reqHost) return image; // 已同源，无需代理
+  if (!OG_IMAGE_PROXY_HOSTS.includes(u.host)) return image; // 白名单外不代理
+  const origin = new URL(request.url).origin;
+  return `${origin}/api/og-image?src=${encodeURIComponent(image)}`;
+}
+
 function buildOgMetaTags(og: OgData): string {
   const tags: string[] = [`<meta property="og:type" content="${og.type}">`];
   if (og.title) tags.push(`<meta property="og:title" content="${og.title}">`);
@@ -173,7 +194,7 @@ async function getArticleOg(request: Request, env: Env, id: string): Promise<OgD
         raw.startsWith("http://") || raw.startsWith("https://")
           ? raw
           : new URL(raw, base).toString();
-      image = safeUrl(abs) ?? safeUrl(raw);
+      image = toSameOriginOgImage(request, safeUrl(abs) ?? safeUrl(raw));
     }
     // 站点名取自后台实时配置(与站点卡片一致)，env 仅作兜底
     const liveSite = await fetchLiveSiteConfig(request, env);
@@ -232,7 +253,7 @@ async function getSiteOg(request: Request, env: Env): Promise<OgData> {
   if (!name && typeof ev?.NAME === "string" && ev.NAME) name = ev.NAME;
   if (!description && typeof ev?.DESCRIPTION === "string" && ev.DESCRIPTION) description = ev.DESCRIPTION;
   if (!avatar && typeof ev?.AVATAR === "string" && ev.AVATAR) avatar = ev.AVATAR;
-  const image = safeUrl(avatar);
+  const image = toSameOriginOgImage(request, safeUrl(avatar));
   return {
     type: "website",
     title: escapeHtmlAttr(name),
