@@ -200,7 +200,6 @@ function MarkdownImage({
   rounded,
   scale,
   className,
-  fill,
 }: {
   src?: string;
   alt?: string;
@@ -208,18 +207,13 @@ function MarkdownImage({
   rounded: boolean;
   scale: string;
   className?: string;
-  // fill=true 时让容器/图片撑满父级宽度（用于文章正文块级图的全屏出血）。
-  // 此时不再用 rounded-xl（屏幕边缘出现圆角会显割裂），也不再 mx-auto 居中。
-  fill?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { src: cleanSrc, blurhash, width, height } = parseImageUrlMetadata(src);
   const [actualSrc, setActualSrc] = useState<string | undefined>(undefined);
   const [naturalRatio, setNaturalRatio] = useState<string | undefined>(undefined);
   const { failed, imageRef, loaded, onError, onLoad } = useImageLoadState(actualSrc);
-  // full-bleed 时去掉 rounded-xl（屏幕边缘出现圆角会显割裂），其他场景保留。
-  const effectiveRounded = rounded && !fill;
-  const roundedClass = effectiveRounded ? "rounded-xl" : "";
+  const roundedClass = rounded ? "rounded-xl" : "";
   // 预留宽高比：已知尺寸用真实比例；未知尺寸（含没有宽高元数据的旧文/行内图）
   // 一律退化为 16:9 占位，避免图片加载完成才撑开高度、把下方正在阅读的内容
   // 突然挤下去（CLS 抖动）。图片真正加载后会用自然尺寸再修正一次，未知尺寸
@@ -310,7 +304,7 @@ function MarkdownImage({
 
   return (
     <span
-      className={`relative ${fill ? "block w-full max-w-none" : "inline-block max-w-full"} overflow-hidden ${roundedClass} ${
+      className={`relative inline-block max-w-full overflow-hidden ${roundedClass} ${
         showPlaceholder ? "bg-w dark:bg-neutral-800" : ""
       }`}
       style={{ zoom: scale, aspectRatio: effectiveAspectRatio }}
@@ -340,7 +334,7 @@ function MarkdownImage({
         }}
         onLoad={handleLoad}
         onError={handleError}
-        className={`${fill ? "block w-full" : "mx-auto max-w-full"} cursor-pointer transition-opacity duration-300 ${roundedClass} ${
+        className={`mx-auto max-w-full cursor-pointer transition-opacity duration-300 ${roundedClass} ${
           className || ""
         } ${showPlaceholder ? "opacity-0" : "opacity-100"}`}
       />
@@ -382,7 +376,7 @@ function MarkdownVideo({
       : "16 / 9");
 
   return (
-    <div className="relative my-4 -mx-8 w-[calc(100%+4rem)] max-w-none overflow-hidden bg-w dark:bg-neutral-800">
+    <div className="relative my-4 w-full overflow-hidden rounded-xl bg-w dark:bg-neutral-800">
       {/* 隐藏的 poster <img>：仅用于读取自然尺寸设定占位比例（缓解 CLS），
           微信内 <img> 正常加载；不可见、不拦截点击，video 自身始终承担显示与交互。 */}
       {posterSrc ? (
@@ -416,7 +410,7 @@ function MarkdownVideo({
           }
         }}
         style={{ aspectRatio: placeholderRatio }}
-        className="block w-full h-auto bg-black"
+        className="block w-full h-auto rounded-xl bg-black"
       />
     </div>
   );
@@ -451,11 +445,9 @@ export function Markdown({ content }: { content: string }) {
           const Image = ({
             rounded,
             scale,
-            fill,
           }: {
             rounded: boolean;
             scale: string;
-            fill?: boolean;
           }) => (
             <MarkdownImage
               src={src}
@@ -464,7 +456,6 @@ export function Markdown({ content }: { content: string }) {
               rounded={rounded}
               scale={scale}
               className={props.className}
-              fill={fill}
             />
           );
           if (
@@ -473,10 +464,8 @@ export function Markdown({ content }: { content: string }) {
             isMarkdownImageLinkAtEnd(previousContent)
           ) {
             return (
-              // 块级图片全屏出血：负 margin 抵消文章卡的 m-2 + px-6，宽度同步 +4rem，
-              // 让图片撑满到屏幕边缘(移动端)/主列边缘(桌面端)，消除左右大量白边。
-              <span className="block -mx-8 w-[calc(100%+4rem)] max-w-none my-4">
-                <Image scale="0.75" rounded={true} fill={true} />
+              <span className="block w-full text-center my-4">
+                <Image scale="0.75" rounded={true} />
               </span>
             );
           } else {
