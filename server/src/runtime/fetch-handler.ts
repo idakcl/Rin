@@ -77,6 +77,9 @@ type OgData = {
   title?: string;
   description?: string;
   image?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+  imageType?: string;
   url?: string;
   siteName?: string;
   twitterCard: string;
@@ -130,6 +133,13 @@ function buildOgMetaTags(og: OgData): string {
   if (og.title) tags.push(`<meta property="og:title" content="${og.title}">`);
   if (og.description) tags.push(`<meta property="og:description" content="${og.description}">`);
   if (og.image) tags.push(`<meta property="og:image" content="${og.image}">`);
+  // 微信/Twitter/LINE 等平台的卡片渲染依赖 og:image 的显式尺寸与 MIME；
+  // 缺尺寸时微信会退化为"无缩略图"卡片，title/desc 都在但图没了。
+  if (og.image) {
+    if (og.imageWidth) tags.push(`<meta property="og:image:width" content="${og.imageWidth}">`);
+    if (og.imageHeight) tags.push(`<meta property="og:image:height" content="${og.imageHeight}">`);
+    if (og.imageType) tags.push(`<meta property="og:image:type" content="${og.imageType}">`);
+  }
   if (og.url) tags.push(`<meta property="og:url" content="${og.url}">`);
   if (og.siteName) tags.push(`<meta property="og:site_name" content="${og.siteName}">`);
   // Twitter Card：大图预览(summary_large_image)，微信/Telegram/X/Discord 通用
@@ -205,6 +215,11 @@ async function getArticleOg(request: Request, env: Env, id: string): Promise<OgD
       title: escapeHtmlAttr(title),
       description: escapeHtmlAttr(description),
       image: image ? escapeHtmlAttr(image) : undefined,
+      // 默认 1200x630 + image/jpeg：微信/Twitter 卡片渲染要求显式尺寸与 MIME，
+      // 没有这些元标签时微信会跳过缩略图只渲染纯文本卡片。
+      imageWidth: 1200,
+      imageHeight: 630,
+      imageType: "image/jpeg",
       url: escapeHtmlAttr(new URL(request.url).toString()),
       siteName: escapeHtmlAttr(siteName),
       twitterCard: "summary_large_image",
@@ -259,6 +274,10 @@ async function getSiteOg(request: Request, env: Env): Promise<OgData> {
     title: escapeHtmlAttr(name),
     description: escapeHtmlAttr(description),
     image: image ? escapeHtmlAttr(image) : undefined,
+    // 同文章页：显式尺寸与 MIME 让微信/Twitter 卡片稳定渲染缩略图
+    imageWidth: 1200,
+    imageHeight: 630,
+    imageType: "image/jpeg",
     url: escapeHtmlAttr(new URL(request.url).toString()),
     siteName: escapeHtmlAttr(name),
     twitterCard: "summary_large_image",
