@@ -144,7 +144,7 @@ export function FeedPage({ id, TOC, clean }: { id: string, TOC: () => JSX.Elemen
           <meta property="og:type" content="article" />
           <meta property="og:url" content={document.URL} />
           <meta
-            name="og:description"
+            property="og:description"
             content={
               feed.content.length > 200
                 ? feed.content.substring(0, 200)
