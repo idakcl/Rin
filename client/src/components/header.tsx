@@ -60,7 +60,7 @@ export function Header({ children }: { children?: React.ReactNode }) {
   }, [headerBehavior, headerLayout]);
 
   const useTopHeader = layoutDefinition.kind === "top";
-  const headerPaddingClassName = headerLayout === "compact" ? "mx-0 mt-0" : "mx-4 mt-4";
+  const headerPaddingClassName = headerLayout === "compact" ? "mx-0 mt-0" : "mx-2 mt-4";
   const containerClassName =
     !useTopHeader || headerBehavior === "static"
       ? "relative z-40 pt-[env(safe-area-inset-top)]"
