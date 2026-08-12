@@ -107,11 +107,8 @@ function safeUrl(u: string | undefined): string | undefined {
   }
 }
 
-// 将跨域图片改写为同源 /api/og-image 代理 URL，提升社交爬虫抓取缩略图成功率。
-// 微信等平台的默认分享卡片对"跨域 / 非常见 TLD"的 og:image 抓取极不稳定，常拉不到
-// 缩略图；改为同源 URL 后，爬虫从站点主域直接取图，卡片(标题+描述+缩略图)稳定显示。
-// 同源图与白名单外主机保持原样(不代理)，避免开放代理与破坏既有行为。
-const OG_IMAGE_PROXY_HOSTS = ["netpan.1234.nyc.mn"];
+// 仅保留"已同源图直接用、跨域图返回 undefined"的判定；跨域图不再代理，
+// 由调用方回退到同源静态 default-og.jpg——微信爬虫对带 query 的代理 URL 抓取不稳/易超时。
 function toSameOriginOgImage(request: Request, image: string | undefined): string | undefined {
   if (!image) return undefined;
   let u: URL;
@@ -123,9 +120,9 @@ function toSameOriginOgImage(request: Request, image: string | undefined): strin
   if (u.protocol !== "http:" && u.protocol !== "https:") return image;
   const reqHost = new URL(request.url).host;
   if (u.host === reqHost) return image; // 已同源，无需代理
-  if (!OG_IMAGE_PROXY_HOSTS.includes(u.host)) return image; // 白名单外不代理
-  const origin = new URL(request.url).origin;
-  return `${origin}/api/og-image?src=${encodeURIComponent(image)}`;
+  // 跨域图(如 netpan)不再走 /api/og-image 代理：微信爬虫对带 query 参数的代理 URL
+  // 抓取不稳/易超时，故直接返回 undefined，由调用方回退到同源静态 default-og.jpg。
+  return undefined;
 }
 
 function buildOgMetaTags(og: OgData): string {
@@ -210,11 +207,15 @@ async function getArticleOg(request: Request, env: Env, id: string): Promise<OgD
     const liveSite = await fetchLiveSiteConfig(request, env);
     const ev = env as unknown as Record<string, any>;
     const siteName = liveSite.name || (typeof ev?.NAME === "string" ? ev.NAME : "");
+    // og:image 同源直链优先：文章首图若已是站点主域图(/api/blob/images/...)直接用；
+    // 否则（跨域 netpan 等）回退到同源静态 default-og.jpg，避免走 /api/og-image 代理
+    // 多一跳回源——微信爬虫对带 query 参数的代理 URL 抓取不稳/易超时，直链最稳。
+    const ogImage = image && image.startsWith(origin) ? image : `${origin}/default-og.jpg`;
     return {
       type: "article",
       title: escapeHtmlAttr(title),
       description: escapeHtmlAttr(description),
-      image: image ? escapeHtmlAttr(image) : undefined,
+      image: escapeHtmlAttr(ogImage),
       // 默认 1200x630 + image/jpeg：微信/Twitter 卡片渲染要求显式尺寸与 MIME，
       // 没有这些元标签时微信会跳过缩略图只渲染纯文本卡片。
       imageWidth: 1200,
@@ -268,12 +269,13 @@ async function getSiteOg(request: Request, env: Env): Promise<OgData> {
   if (!name && typeof ev?.NAME === "string" && ev.NAME) name = ev.NAME;
   if (!description && typeof ev?.DESCRIPTION === "string" && ev.DESCRIPTION) description = ev.DESCRIPTION;
   if (!avatar && typeof ev?.AVATAR === "string" && ev.AVATAR) avatar = ev.AVATAR;
-  const image = toSameOriginOgImage(request, safeUrl(avatar));
+  const origin = new URL(request.url).origin;
+const image = `${origin}/default-og.jpg`;
   return {
     type: "website",
     title: escapeHtmlAttr(name),
     description: escapeHtmlAttr(description),
-    image: image ? escapeHtmlAttr(image) : undefined,
+    image: escapeHtmlAttr(image),
     // 同文章页：显式尺寸与 MIME 让微信/Twitter 卡片稳定渲染缩略图
     imageWidth: 1200,
     imageHeight: 630,
