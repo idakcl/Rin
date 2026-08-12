@@ -125,6 +125,26 @@ function toSameOriginOgImage(request: Request, image: string | undefined): strin
   return undefined;
 }
 
+// 站点级卡片(首页/标签页/关于等非文章页)的头像解析：
+// - 相对路径(如 /api/blob/images/xxx)按当前站点 origin 补全为同源绝对 URL；
+// - 仅同源头像可被微信爬虫稳定抓取：跨域头像(如 netpan)抓取不稳，返回 undefined，
+//   由 getSiteOg 回退到同源静态 default-og.jpg，避免卡片退化。
+function resolveSiteAvatarOg(request: Request, avatar: string | undefined): string | undefined {
+  if (!avatar) return undefined;
+  let abs: string;
+  try {
+    const u = new URL(avatar);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return undefined;
+    abs = u.toString();
+  } catch {
+    // 相对路径按当前站点 origin 补全为绝对 URL
+    abs = new URL(avatar, new URL(request.url).origin).toString();
+  }
+  const reqHost = new URL(request.url).host;
+  if (new URL(abs).host !== reqHost) return undefined; // 跨域头像不稳定，回退
+  return abs;
+}
+
 function buildOgMetaTags(og: OgData): string {
   const tags: string[] = [`<meta property="og:type" content="${og.type}">`];
   if (og.title) tags.push(`<meta property="og:title" content="${og.title}">`);
@@ -270,7 +290,9 @@ async function getSiteOg(request: Request, env: Env): Promise<OgData> {
   if (!description && typeof ev?.DESCRIPTION === "string" && ev.DESCRIPTION) description = ev.DESCRIPTION;
   if (!avatar && typeof ev?.AVATAR === "string" && ev.AVATAR) avatar = ev.AVATAR;
   const origin = new URL(request.url).origin;
-const image = `${origin}/default-og.jpg`;
+  // 首页/站点级分享卡片优先用网站头像(同源 /api/blob/images/...)，微信爬虫可稳定抓取；
+  // 头像为空/非法/跨域(如 netpan)时回退到品牌渐变 default-og.jpg，避免卡片退化。
+  const image = resolveSiteAvatarOg(request, avatar) ?? `${origin}/default-og.jpg`;
   return {
     type: "website",
     title: escapeHtmlAttr(name),
